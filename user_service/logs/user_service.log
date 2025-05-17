@@ -1,0 +1,2 @@
+2025-05-11 18:57:10,151 INFO: User service startup [in C:\Users\oem\Documents\flask_microservices_scaffold\user_service\app\__init__.py:156]
+2025-05-11 18:57:10,458 ERROR: Page not found: http://localhost/api/v1/users/register [in C:\Users\oem\Documents\flask_microservices_scaffold\user_service\app\__init__.py:253]
