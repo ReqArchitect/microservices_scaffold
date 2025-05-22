@@ -1,0 +1,41 @@
+# Enhanced Architecture Additional Requirements
+# These requirements are for the enhanced features of the microservices architecture
+
+# Monitoring and Observability
+prometheus-client==0.16.0
+opentelemetry-api==1.16.0
+opentelemetry-sdk==1.16.0
+opentelemetry-instrumentation-flask==0.37b0
+opentelemetry-exporter-jaeger==1.16.0
+opentelemetry-instrumentation-requests==0.37b0
+flask-prometheus-metrics==1.0.0
+jaeger-client==4.8.0
+
+# Service Mesh and Discovery
+python-consul==1.1.0
+envoy-protoc==0.2.0
+
+# Security
+cryptography==39.0.1
+pyOpenSSL==23.1.1
+python-jose==3.3.0
+
+# Resilience
+tenacity==8.2.2
+circuitbreaker==1.4.0
+
+# Performance
+gunicorn==20.1.0
+gevent==22.10.2
+Werkzeug==2.2.3
+
+# Testing
+pytest-asyncio==0.21.0
+locust==2.15.1
+kubernetes==26.1.0
+docker==6.1.0
+chaostoolkit==1.13.0
+chaostoolkit-kubernetes==0.35.0
+
+# Utilities
+termcolor==2.3.0

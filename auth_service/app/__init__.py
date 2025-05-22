@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
@@ -15,6 +15,19 @@ from datetime import datetime, timedelta
 from .config import DevelopmentConfig, TestingConfig, ProductionConfig
 from flask_sqlalchemy import SQLAlchemy
 from prometheus_flask_exporter import PrometheusMetrics
+
+from common_utils.service_registry import ServiceRegistry
+from common_utils.tracing import Tracer
+from common_utils.versioning import VersionedAPI
+from prometheus_flask_exporter import PrometheusMetrics
+
+# Initialize extensions
+metrics = PrometheusMetrics.for_app_factory()
+service_registry = ServiceRegistry()
+tracer = Tracer()
+versioned_api = VersionedAPI()
+
+
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -131,6 +144,20 @@ def create_app(config_name='development'):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+
+    # Initialize enhanced architecture components
+    metrics.init_app(app)
+    service_registry.init_app(app)
+    tracer.init_app(app)
+    versioned_api.init_app(app)
+
+    # Import routes with versioning
+    from .routes_versioned import create_api_blueprint
+    
+    # Create and register versioned blueprint
+    api_version = app.config.get('API_VERSION')
+    api_bp = create_api_blueprint(api_version)
+    versioned_api.register_version(api_version, api_bp)
     limiter.init_app(app)
     cache.init_app(app)
     cors.init_app(app)
@@ -158,6 +185,8 @@ def create_app(config_name='development'):
     # Register blueprints
     from .routes import auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/api/v1/auth')
+    from .admin_routes import bp as admin_blueprint
+    app.register_blueprint(admin_blueprint, url_prefix='/v1/admin')
     
     # Request monitoring middleware
     @app.before_request

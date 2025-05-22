@@ -1,3 +1,5 @@
+import uuid
+from common_utils.outbox import OutboxMixin
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -126,4 +128,49 @@ class UserActivity(db.Model):
             'details': self.details,
             'ip_address': self.ip_address,
             'created_at': self.created_at.isoformat() if self.created_at else None
-        } 
+        }
+
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.String(255))
+
+class Permission(db.Model):
+    __tablename__ = 'permissions'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.String(255))
+
+class UserRole(db.Model):
+    __tablename__ = 'user_roles'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+
+
+# Outbox Event model for cross-service data consistency
+class OutboxEvent(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    event_type = db.Column(db.String(100), nullable=False, index=True)
+    aggregate_type = db.Column(db.String(100), nullable=False)
+    aggregate_id = db.Column(db.String(36), nullable=False)
+    payload = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default="pending", index=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    error = db.Column(db.Text, nullable=True)
+    retry_count = db.Column(db.Integer, default=0)
+
+    @classmethod
+    def create_event(cls, session, event_type, aggregate_type, aggregate_id, payload):
+        """Create a new outbox event"""
+        import json
+        event = cls(
+            event_type=event_type,
+            aggregate_type=aggregate_type,
+            aggregate_id=str(aggregate_id),
+            payload=json.dumps(payload)
+        )
+        session.add(event)
+        return event

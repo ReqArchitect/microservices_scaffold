@@ -1,0 +1,198 @@
+version: '3.8'
+
+services:
+  strategy_service:
+    build: ./strategy_service
+    command: python main.py
+    ports:
+      - "5001:5001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@strategy_db:5432/strategy_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - strategy_db
+    networks:
+      - reqarchitect
+
+  business_layer_service:
+    build: ./business_layer_service
+    command: python main.py
+    ports:
+      - "5002:5002"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@business_db:5432/business_layer_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - business_db
+    networks:
+      - reqarchitect
+
+  user_service:
+    build: ./user_service
+    command: python main.py
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@user_db:5432/user_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - user_db
+    networks:
+      - reqarchitect
+
+  auth_service:
+    build: ./auth_service
+    command: python main.py
+    ports:
+      - "5006:5006"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@auth_db:5432/auth_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - auth_db
+    networks:
+      - reqarchitect
+
+  initiative_service:
+    build: ./initiative_service
+    command: python main.py
+    ports:
+      - "5002:5002"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@initiative_db:5432/initiative_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - initiative_db
+    networks:
+      - reqarchitect
+
+  kpi_service:
+    build: ./kpi_service
+    command: python main.py
+    ports:
+      - "5003:5003"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@kpi_db:5432/kpi_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - kpi_db
+    networks:
+      - reqarchitect
+
+  business_case_service:
+    build: ./business_case_service
+    command: python main.py
+    ports:
+      - "5004:5004"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@business_case_db:5432/business_case_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+    depends_on:
+      - business_case_db
+    networks:
+      - reqarchitect
+
+  strategy_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: strategy_service
+    ports:
+      - "5433:5432"
+    networks:
+      - reqarchitect
+
+  business_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: business_layer_service
+    ports:
+      - "5434:5432"
+    networks:
+      - reqarchitect
+
+  user_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_service
+    ports:
+      - "5435:5432"
+    networks:
+      - reqarchitect
+
+  auth_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_service
+    ports:
+      - "5436:5432"
+    networks:
+      - reqarchitect
+
+  initiative_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: initiative_service
+    ports:
+      - "5437:5432"
+    networks:
+      - reqarchitect
+
+  kpi_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kpi_service
+    ports:
+      - "5438:5432"
+    networks:
+      - reqarchitect
+
+  business_case_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: business_case_service
+    ports:
+      - "5439:5432"
+    networks:
+      - reqarchitect
+
+  e2e_tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      - strategy_service
+      - business_layer_service
+      - user_service
+      - auth_service
+      - initiative_service
+      - kpi_service
+      - business_case_service
+    networks:
+      - reqarchitect
+    environment:
+      - STRATEGY_URL=http://strategy_service:5001/api/capabilities
+      - BUSINESS_URL=http://business_layer_service:5002/api/business_actors
+      - USER_SERVICE_URL=http://user_service:5000/health
+      - AUTH_SERVICE_URL=http://auth_service:5006/health
+      - INITIATIVE_SERVICE_URL=http://initiative_service:5002/health
+      - KPI_SERVICE_URL=http://kpi_service:5003/health
+      - BUSINESS_CASE_SERVICE_URL=http://business_case_service:5004/health
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+
+networks:
+  reqarchitect:
+    driver: bridge

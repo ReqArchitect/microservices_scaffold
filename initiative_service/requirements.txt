@@ -7,7 +7,7 @@ Flask-Caching==2.0.2
 Flask-Limiter==3.5.0
 Flasgger==0.9.7.1
 python-dotenv==1.0.0
-psycopg==3.1.12
+psycopg[binary]
 prometheus-client==0.17.1
 prometheus-flask-exporter==0.22.4
 pytest==7.4.2
@@ -16,3 +16,21 @@ responses==0.23.3
 requests==2.31.0
 redis==5.0.1
 gunicorn==21.2.0
+
+# Service Registry
+python-consul==1.1.0
+
+# Distributed Tracing
+opentelemetry-api>=1.15.0
+opentelemetry-sdk>=1.15.0
+opentelemetry-exporter-jaeger>=1.15.0
+opentelemetry-instrumentation-flask>=0.37b0
+opentelemetry-instrumentation-requests>=0.37b0
+opentelemetry-instrumentation-sqlalchemy>=0.37b0
+
+# Monitoring
+prometheus-flask-exporter>=0.22.4
+
+# API Versioning
+apispec>=6.0.0
+flask-apispec>=0.11.0

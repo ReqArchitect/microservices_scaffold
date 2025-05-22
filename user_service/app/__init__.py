@@ -8,10 +8,15 @@ from flask_cors import CORS
 import logging
 from logging.handlers import RotatingFileHandler
 import os
-from prometheus_client import Counter, Histogram, Gauge, Summary
+from prometheus_flask_exporter import PrometheusMetrics
 import time
 from datetime import datetime, timedelta
 from collections import defaultdict
+
+# Import enhanced architecture components
+from common_utils.service_registry import ServiceRegistry
+from common_utils.tracing import Tracer
+from common_utils.versioning import VersionedAPI
 
 # Initialize extensions
 from app.models import db
@@ -20,15 +25,10 @@ jwt = JWTManager()
 limiter = Limiter(key_func=get_remote_address, enabled=False)
 swagger = Swagger()
 cors = CORS()
-
-# Prometheus metrics
-REQUEST_COUNT = Counter(
-    'http_requests_total',
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status']
-)
-
-REQUEST_LATENCY = Histogram(
+metrics = PrometheusMetrics.for_app_factory()
+service_registry = ServiceRegistry()
+tracer = Tracer()
+versioned_api = VersionedAPI()
     'http_request_duration_seconds',
     'HTTP request latency',
     ['method', 'endpoint']
@@ -122,10 +122,16 @@ def create_app(config_name="development"):
     else:
         app.config.from_object("app.config.ProductionConfig")
 
-    # Initialize extensions
+    # Initialize core extensions
     db.init_app(app)  # Initialize SQLAlchemy with the app
     migrate.init_app(app, db)
     jwt.init_app(app)
+    
+    # Initialize enhanced architecture components
+    metrics.init_app(app)
+    service_registry.init_app(app)
+    tracer.init_app(app)
+    versioned_api.init_app(app)
     
     # Configure rate limiter based on environment
     if not app.config.get('RATELIMIT_ENABLED', True):
@@ -142,22 +148,41 @@ def create_app(config_name="development"):
     # Configure logging
     if not os.path.exists('logs'):
         os.mkdir('logs')
-    file_handler = RotatingFileHandler('logs/user_service.log',
-                                     maxBytes=10240,
-                                     backupCount=10)
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s '
-        '[in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
+    if app.config.get('TESTING', False):
+        # Use StreamHandler for tests to avoid file lock issues
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        stream_handler.setLevel(logging.INFO)
+        app.logger.addHandler(stream_handler)
+    else:
+        file_handler = RotatingFileHandler('logs/user_service.log',
+                                         maxBytes=10240,
+                                         backupCount=10)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s '
+            '[in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
 
     app.logger.setLevel(logging.INFO)
     app.logger.info('User service startup')
 
     # Register blueprints
-    from app.routes import v1_blueprint
-    app.register_blueprint(v1_blueprint)
+    from app.routes_versioned import create_api_blueprint
+    
+    # Create and register versioned blueprint
+    api_version = app.config.get('API_VERSION', 'v1')
+    api_bp = create_api_blueprint(api_version)
+    versioned_api.register_version(api_version, api_bp)
+    
+    # Add health check endpoint
+    @app.route('/health')
+    @metrics.do_not_track()
+    def health_check():
+        return {'status': 'healthy', 'service': app.config.get('SERVICE_NAME')}, 200
 
     # Request monitoring middleware
     @app.before_request

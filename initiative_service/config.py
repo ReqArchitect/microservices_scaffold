@@ -6,9 +6,13 @@ load_dotenv()
 
 class Config:
     """Base configuration."""
+    # Service identity and discovery
     SERVICE_NAME = os.environ.get('SERVICE_NAME', 'initiative_service')
+    SERVICE_PORT = int(os.environ.get('SERVICE_PORT', 5004))
+    
+    # Core settings
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev')
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:password@localhost:5432/initiative_service")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:password@localhost:5432/initiative_service")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
@@ -28,6 +32,30 @@ class Config:
     JWT_HEADER_TYPE = 'Bearer'
     JWT_TOKEN_LOCATION = ['headers']
     JWT_BLACKLIST_ENABLED = False
+    
+    # Service registry (Consul) configuration
+    CONSUL_HOST = os.environ.get('CONSUL_HOST', 'localhost')
+    CONSUL_PORT = int(os.environ.get('CONSUL_PORT', 8500))
+    AUTO_REGISTER_SERVICE = os.environ.get('AUTO_REGISTER_SERVICE', 'true').lower() == 'true'
+    
+    # Circuit breaker configuration
+    CIRCUIT_BREAKER_ENABLED = os.environ.get('CIRCUIT_BREAKER_ENABLED', 'true').lower() == 'true'
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.environ.get('CIRCUIT_BREAKER_FAILURE_THRESHOLD', 5))
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT = int(os.environ.get('CIRCUIT_BREAKER_RECOVERY_TIMEOUT', 30))
+    
+    # Distributed tracing configuration
+    JAEGER_HOST = os.environ.get('JAEGER_HOST', 'localhost')
+    JAEGER_PORT = int(os.environ.get('JAEGER_PORT', 6831))
+    TRACING_ENABLED = os.environ.get('TRACING_ENABLED', 'true').lower() == 'true'
+    
+    # API versioning
+    API_VERSION = os.environ.get('API_VERSION', 'v1')
+    LATEST_API_VERSION = os.environ.get('LATEST_API_VERSION', 'v1')
+    
+    # Outbox pattern
+    OUTBOX_PROCESSING_INTERVAL = int(os.environ.get('OUTBOX_PROCESSING_INTERVAL', 10))  # seconds
+    OUTBOX_MAX_RETRY = int(os.environ.get('OUTBOX_MAX_RETRY', 3))
+    OUTBOX_ENABLED = os.environ.get('OUTBOX_ENABLED', 'true').lower() == 'true'
 
     # Rate Limiting
     RATELIMIT_ENABLED = True
@@ -82,14 +110,14 @@ class DevelopmentConfig(Config):
     DEBUG = True
     TESTING = False
     RATELIMIT_ENABLED = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql+psycopg://postgres:password@localhost:5432/initiative_service')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://postgres:password@localhost:5432/initiative_service')
     SQLALCHEMY_ECHO = True
 
 class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL', 'postgresql+psycopg://postgres:password@localhost:5432/initiative_service_test')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL', 'postgresql+psycopg2://postgres:password@localhost:5432/initiative_service_test')
     RATELIMIT_ENABLED = False
     CACHE_TYPE = "simple"
     LOG_LEVEL = "DEBUG"
@@ -128,3 +156,31 @@ config = {
     'production': ProductionConfig,
     'default': DevelopmentConfig
 }
+
+# Service identity and discovery
+SERVICE_NAME = os.environ.get('SERVICE_NAME', 'initiative_service')
+SERVICE_PORT = int(os.environ.get('SERVICE_PORT', 5002))
+
+# Service registry (Consul) configuration
+CONSUL_HOST = os.environ.get('CONSUL_HOST', 'localhost')
+CONSUL_PORT = int(os.environ.get('CONSUL_PORT', 8500))
+AUTO_REGISTER_SERVICE = os.environ.get('AUTO_REGISTER_SERVICE', 'true').lower() == 'true'
+
+# Circuit breaker configuration
+CIRCUIT_BREAKER_ENABLED = os.environ.get('CIRCUIT_BREAKER_ENABLED', 'true').lower() == 'true'
+CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.environ.get('CIRCUIT_BREAKER_FAILURE_THRESHOLD', 5))
+CIRCUIT_BREAKER_RECOVERY_TIMEOUT = int(os.environ.get('CIRCUIT_BREAKER_RECOVERY_TIMEOUT', 30))
+
+# Distributed tracing configuration
+JAEGER_HOST = os.environ.get('JAEGER_HOST', 'localhost')
+JAEGER_PORT = int(os.environ.get('JAEGER_PORT', 6831))
+TRACING_ENABLED = os.environ.get('TRACING_ENABLED', 'true').lower() == 'true'
+
+# API versioning
+API_VERSION = os.environ.get('API_VERSION', 'v1')
+LATEST_API_VERSION = os.environ.get('LATEST_API_VERSION', 'v1')
+
+# Outbox pattern
+OUTBOX_PROCESSING_INTERVAL = int(os.environ.get('OUTBOX_PROCESSING_INTERVAL', 10))  # seconds
+OUTBOX_MAX_RETRY = int(os.environ.get('OUTBOX_MAX_RETRY', 3))
+OUTBOX_ENABLED = os.environ.get('OUTBOX_ENABLED', 'true').lower() == 'true'

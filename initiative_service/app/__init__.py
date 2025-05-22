@@ -1,7 +1,6 @@
 # app/__init__.py
 from flask import Flask, request, jsonify
 from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
@@ -16,12 +15,23 @@ from datetime import datetime, timedelta
 from .config import DevelopmentConfig, TestingConfig, ProductionConfig
 from flask_sqlalchemy import SQLAlchemy
 from prometheus_flask_exporter import PrometheusMetrics
-from .auth import ROLES, get_user_permissions
+
+from common_utils.service_registry import ServiceRegistry
+from common_utils.tracing import Tracer
+from common_utils.versioning import VersionedAPI
+from prometheus_flask_exporter import PrometheusMetrics
+
+# Initialize extensions
+metrics = PrometheusMetrics.for_app_factory()
+service_registry = ServiceRegistry()
+tracer = Tracer()
+versioned_api = VersionedAPI()
+
+
 
 # Initialize extensions
 db = SQLAlchemy()
 migrate = Migrate()
-jwt = JWTManager()
 limiter = Limiter(key_func=get_remote_address)
 cache = Cache(config={
     'CACHE_TYPE': 'simple',
@@ -56,100 +66,6 @@ ACTIVE_INITIATIVES = Gauge(
     ['tenant_id']
 )
 
-# JWT configuration
-@jwt.user_identity_loader
-def user_identity_lookup(user):
-    """Convert user object or dict to JWT identity."""
-    if isinstance(user, dict):
-        return {
-            'id': user.get('id'),
-            'tenant_id': user.get('tenant_id'),
-            'role': user.get('role', 'user')
-        }
-    return {
-        'id': getattr(user, 'id', None),
-        'tenant_id': getattr(user, 'tenant_id', None),
-        'role': getattr(user, 'role', 'user')
-    }
-
-@jwt.user_lookup_loader
-def user_lookup_callback(_jwt_header, jwt_data):
-    """Load user from JWT data."""
-    try:
-        identity = jwt_data.get("identity")
-        app.logger.debug(f"JWT data: {jwt_data}")
-        app.logger.debug(f"Identity from JWT: {identity}")
-        
-        if not isinstance(identity, dict):
-            app.logger.error(f"Invalid identity type: {type(identity)}")
-            return None
-        
-        # Ensure required fields are present
-        required_fields = ['id', 'tenant_id', 'role']
-        missing_fields = [field for field in required_fields if field not in identity]
-        if missing_fields:
-            app.logger.error(f"Missing required fields in identity: {missing_fields}")
-            return None
-        
-        # Validate role
-        role = identity.get('role')
-        if role not in ROLES:
-            app.logger.error(f"Invalid role in identity: {role}")
-            return None
-        
-        return identity
-    except Exception as e:
-        app.logger.error(f"Error in user_lookup_callback: {str(e)}")
-        return None
-
-@jwt.additional_claims_loader
-def add_claims_to_access_token(identity):
-    """Add role-based permissions to JWT claims."""
-    try:
-        if not isinstance(identity, dict):
-            app.logger.error(f"Invalid identity type in claims loader: {type(identity)}")
-            return {}
-        
-        role = identity.get('role', 'user')
-        if role not in ROLES:
-            app.logger.error(f"Invalid role in claims loader: {role}")
-            return {}
-        
-        permissions = get_user_permissions(role)
-        return {
-            'permissions': permissions,
-            'fresh': True,
-            'type': 'access'
-        }
-    except Exception as e:
-        app.logger.error(f"Error in add_claims_to_access_token: {str(e)}")
-        return {}
-
-@jwt.unauthorized_loader
-def unauthorized_callback(error_string):
-    """Handle missing JWT token."""
-    return jsonify({"error": "Missing authorization header"}), 401
-
-@jwt.invalid_token_loader
-def invalid_token_callback(error_string):
-    """Handle invalid JWT token."""
-    return jsonify({"error": "Invalid token"}), 401
-
-@jwt.expired_token_loader
-def expired_token_callback(jwt_header, jwt_payload):
-    """Handle expired JWT token."""
-    return jsonify({"error": "Token has expired"}), 401
-
-@jwt.needs_fresh_token_loader
-def token_not_fresh_callback(jwt_header, jwt_payload):
-    """Handle non-fresh token when fresh is required."""
-    return jsonify({"error": "Fresh token required"}), 401
-
-@jwt.revoked_token_loader
-def revoked_token_callback(jwt_header, jwt_payload):
-    """Handle revoked token."""
-    return jsonify({"error": "Token has been revoked"}), 401
-
 def create_app(config_name='development'):
     """Create and configure the Flask application."""
     app = Flask(__name__)
@@ -168,7 +84,20 @@ def create_app(config_name='development'):
     # Initialize extensions with app
     db.init_app(app)
     migrate.init_app(app, db)
-    jwt.init_app(app)
+
+    # Initialize enhanced architecture components
+    metrics.init_app(app)
+    service_registry.init_app(app)
+    tracer.init_app(app)
+    versioned_api.init_app(app)
+
+    # Import routes with versioning
+    from .routes_versioned import create_api_blueprint
+    
+    # Create and register versioned blueprint
+    api_version = app.config.get('API_VERSION')
+    api_bp = create_api_blueprint(api_version)
+    versioned_api.register_version(api_version, api_bp)
     limiter.init_app(app)
     cache.init_app(app)
     cors.init_app(app)

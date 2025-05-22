@@ -1,0 +1,341 @@
+version: '3.8'
+
+services:
+  # Service mesh proxy (Envoy)
+  envoy:
+    image: envoyproxy/envoy:v1.24-latest
+    ports:
+      - "9901:9901"  # Admin interface
+      - "10000:10000"  # API Gateway entry point
+    volumes:
+      - ./service_mesh/envoy.yaml:/etc/envoy/envoy.yaml
+    networks:
+      - reqarchitect
+    depends_on:
+      - consul
+      - jaeger
+
+  # Service discovery
+  consul:
+    image: consul:1.15
+    ports:
+      - "8500:8500"  # UI and HTTP API
+      - "8600:8600/udp"  # DNS interface
+    command: "agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0"
+    volumes:
+      - consul_data:/consul/data
+    networks:
+      - reqarchitect
+
+  # Distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.40
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # UI port
+      - "14268:14268"  # Collector HTTP port
+      - "14250:14250"  # Collector gRPC port
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    networks:
+      - reqarchitect
+
+  # Application services
+  strategy_service:
+    build: ./strategy_service
+    command: python main.py
+    ports:
+      - "5001:5001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@strategy_db:5432/strategy_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=strategy_service
+      - SERVICE_PORT=5001
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - strategy_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  business_layer_service:
+    build: ./business_layer_service
+    command: python main.py
+    ports:
+      - "5002:5002"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@business_db:5432/business_layer_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=business_layer_service
+      - SERVICE_PORT=5002
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - business_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  user_service:
+    build: ./user_service
+    command: python main.py
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@user_db:5432/user_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=user_service
+      - SERVICE_PORT=5000
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - user_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  auth_service:
+    build: ./auth_service
+    command: python main.py
+    ports:
+      - "5006:5006"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@auth_db:5432/auth_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=auth_service
+      - SERVICE_PORT=5006
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - auth_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  initiative_service:
+    build: ./initiative_service
+    command: python main.py
+    ports:
+      - "5007:5007"  # Fixed port conflict with business_layer_service
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@initiative_db:5432/initiative_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=initiative_service
+      - SERVICE_PORT=5007
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - initiative_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  kpi_service:
+    build: ./kpi_service
+    command: python main.py
+    ports:
+      - "5003:5003"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@kpi_db:5432/kpi_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=kpi_service
+      - SERVICE_PORT=5003
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - kpi_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  business_case_service:
+    build: ./business_case_service
+    command: python main.py
+    ports:
+      - "5004:5004"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@business_case_db:5432/business_case_service
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - SERVICE_NAME=business_case_service
+      - SERVICE_PORT=5004
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - API_VERSION=v1
+    depends_on:
+      - business_case_db
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+
+  # Databases
+  strategy_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: strategy_service
+    ports:
+      - "5433:5432"
+    volumes:
+      - strategy_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  business_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: business_layer_service
+    ports:
+      - "5434:5432"
+    volumes:
+      - business_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  user_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_service
+    ports:
+      - "5435:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  auth_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_service
+    ports:
+      - "5436:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  initiative_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: initiative_service
+    ports:
+      - "5437:5432"
+    volumes:
+      - initiative_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  kpi_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kpi_service
+    ports:
+      - "5438:5432"
+    volumes:
+      - kpi_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  business_case_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: business_case_service
+    ports:
+      - "5439:5432"
+    volumes:
+      - business_case_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+
+  # End-to-end test service
+  e2e_tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      - strategy_service
+      - business_layer_service
+      - user_service
+      - auth_service
+      - initiative_service
+      - kpi_service
+      - business_case_service
+    networks:
+      - reqarchitect
+    environment:
+      - STRATEGY_URL=http://strategy_service:5001/api/v1/capabilities
+      - BUSINESS_URL=http://business_layer_service:5002/api/v1/business_actors
+      - USER_SERVICE_URL=http://user_service:5000/health
+      - AUTH_SERVICE_URL=http://auth_service:5006/health
+      - INITIATIVE_SERVICE_URL=http://initiative_service:5007/health
+      - KPI_SERVICE_URL=http://kpi_service:5003/health
+      - BUSINESS_CASE_SERVICE_URL=http://business_case_service:5004/health
+      - JWT_SECRET_KEY=jwt-dev-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+
+volumes:
+  consul_data:
+  strategy_db_data:
+  business_db_data:
+  user_db_data:
+  auth_db_data:
+  initiative_db_data:
+  kpi_db_data:
+  business_case_db_data:
+
+networks:
+  reqarchitect:
+    driver: bridge

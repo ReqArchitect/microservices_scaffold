@@ -1,3 +1,6 @@
+import uuid
+import datetime
+from common_utils.outbox import OutboxMixin
 from sqlalchemy import Column, String, Float, Date, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.extensions import db
@@ -39,3 +42,30 @@ class KPI(db.Model):
             'start_date': str(self.start_date) if self.start_date else None,
             'end_date': str(self.end_date) if self.end_date else None
         }
+
+
+# Outbox Event model for cross-service data consistency
+class OutboxEvent(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    event_type = db.Column(db.String(100), nullable=False, index=True)
+    aggregate_type = db.Column(db.String(100), nullable=False)
+    aggregate_id = db.Column(db.String(36), nullable=False)
+    payload = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default="pending", index=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    error = db.Column(db.Text, nullable=True)
+    retry_count = db.Column(db.Integer, default=0)
+
+    @classmethod
+    def create_event(cls, session, event_type, aggregate_type, aggregate_id, payload):
+        """Create a new outbox event"""
+        import json
+        event = cls(
+            event_type=event_type,
+            aggregate_type=aggregate_type,
+            aggregate_id=str(aggregate_id),
+            payload=json.dumps(payload)
+        )
+        session.add(event)
+        return event

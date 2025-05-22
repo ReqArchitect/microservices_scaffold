@@ -15,13 +15,13 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg://postgres:password@localhost:5432/auth_service'
+    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://postgres:password@localhost:5432/auth_service'
 
 class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg://postgres:password@localhost:5432/auth_service_test'
+    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://postgres:password@localhost:5432/auth_service_test'
 
 class ProductionConfig(Config):
     """Production configuration."""
@@ -33,4 +33,32 @@ config = {
     'testing': TestingConfig,
     'production': ProductionConfig,
     'default': DevelopmentConfig
-} 
+}
+
+# Service identity and discovery
+SERVICE_NAME = os.environ.get('SERVICE_NAME', 'auth_service')
+SERVICE_PORT = int(os.environ.get('SERVICE_PORT', 5006))
+
+# Service registry (Consul) configuration
+CONSUL_HOST = os.environ.get('CONSUL_HOST', 'localhost')
+CONSUL_PORT = int(os.environ.get('CONSUL_PORT', 8500))
+AUTO_REGISTER_SERVICE = os.environ.get('AUTO_REGISTER_SERVICE', 'true').lower() == 'true'
+
+# Circuit breaker configuration
+CIRCUIT_BREAKER_ENABLED = os.environ.get('CIRCUIT_BREAKER_ENABLED', 'true').lower() == 'true'
+CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.environ.get('CIRCUIT_BREAKER_FAILURE_THRESHOLD', 5))
+CIRCUIT_BREAKER_RECOVERY_TIMEOUT = int(os.environ.get('CIRCUIT_BREAKER_RECOVERY_TIMEOUT', 30))
+
+# Distributed tracing configuration
+JAEGER_HOST = os.environ.get('JAEGER_HOST', 'localhost')
+JAEGER_PORT = int(os.environ.get('JAEGER_PORT', 6831))
+TRACING_ENABLED = os.environ.get('TRACING_ENABLED', 'true').lower() == 'true'
+
+# API versioning
+API_VERSION = os.environ.get('API_VERSION', 'v1')
+LATEST_API_VERSION = os.environ.get('LATEST_API_VERSION', 'v1')
+
+# Outbox pattern
+OUTBOX_PROCESSING_INTERVAL = int(os.environ.get('OUTBOX_PROCESSING_INTERVAL', 10))  # seconds
+OUTBOX_MAX_RETRY = int(os.environ.get('OUTBOX_MAX_RETRY', 3))
+OUTBOX_ENABLED = os.environ.get('OUTBOX_ENABLED', 'true').lower() == 'true'

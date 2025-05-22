@@ -1,0 +1,7 @@
+FROM python:3.13
+WORKDIR /e2e
+COPY e2e_tests/ ./e2e_tests/
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install pytest requests PyJWT
+CMD ["pytest", "e2e_tests/test_e2e_strategy_to_business.py"]

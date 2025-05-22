@@ -1,0 +1,265 @@
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 10000 }
+    filter_chains:
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain: { filename: "/etc/envoy/certs/envoy.crt" }
+              private_key: { filename: "/etc/envoy/certs/envoy.key" }
+            validation_context:
+              trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+            alpn_protocols: ["h2", "http/1.1"]
+          require_client_certificate: true
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: app
+              domains: ["*"]
+              routes:
+              # Strategy Service Routes
+              - match:
+                  prefix: "/api/v1/capabilities"
+                route:
+                  prefix_rewrite: "/api/v1/capabilities"
+                  cluster: strategy_service
+                  timeout: 30s
+              
+              # Business Layer Service Routes
+              - match:
+                  prefix: "/api/v1/business"
+                route:
+                  prefix_rewrite: "/api/v1/business"
+                  cluster: business_layer_service
+                  timeout: 30s
+              
+              # User Service Routes
+              - match:
+                  prefix: "/api/v1/users"
+                route:
+                  prefix_rewrite: "/api/v1/users"
+                  cluster: user_service
+                  timeout: 30s
+              
+              # KPI Service Routes
+              - match:
+                  prefix: "/api/v1/kpis"
+                route:
+                  prefix_rewrite: "/api/v1/kpis"
+                  cluster: kpi_service
+                  timeout: 30s
+              
+              # Initiative Service Routes
+              - match:
+                  prefix: "/api/v1/initiatives"
+                route:
+                  prefix_rewrite: "/api/v1/initiatives"
+                  cluster: initiative_service
+                  timeout: 30s
+          
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          tracing:
+            provider:
+              name: envoy.tracers.zipkin
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+                collector_cluster: jaeger
+                collector_endpoint: "/api/v2/spans"
+                shared_span_context: false
+                collector_endpoint_version: HTTP_JSON
+
+  clusters:
+  - name: strategy_service
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: strategy_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: strategy-service
+                port_value: 5001
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "/etc/envoy/certs/envoy.crt" }
+            private_key: { filename: "/etc/envoy/certs/envoy.key" }
+          validation_context:
+            trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+    health_checks:
+      - timeout: 1s
+        interval: 10s
+        unhealthy_threshold: 3
+        healthy_threshold: 3
+        http_health_check:
+          path: "/health"
+          
+  - name: business_layer_service
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: business_layer_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: business-layer-service
+                port_value: 5002
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "/etc/envoy/certs/envoy.crt" }
+            private_key: { filename: "/etc/envoy/certs/envoy.key" }
+          validation_context:
+            trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+    health_checks:
+      - timeout: 1s
+        interval: 10s
+        unhealthy_threshold: 3
+        healthy_threshold: 3
+        http_health_check:
+          path: "/health"
+          
+  - name: user_service
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: user_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: user-service
+                port_value: 5003
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "/etc/envoy/certs/envoy.crt" }
+            private_key: { filename: "/etc/envoy/certs/envoy.key" }
+          validation_context:
+            trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+    health_checks:
+      - timeout: 1s
+        interval: 10s
+        unhealthy_threshold: 3
+        healthy_threshold: 3
+        http_health_check:
+          path: "/health"
+          
+  - name: kpi_service
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: kpi_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: kpi-service
+                port_value: 5004
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "/etc/envoy/certs/envoy.crt" }
+            private_key: { filename: "/etc/envoy/certs/envoy.key" }
+          validation_context:
+            trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+    health_checks:
+      - timeout: 1s
+        interval: 10s
+        unhealthy_threshold: 3
+        healthy_threshold: 3
+        http_health_check:
+          path: "/health"
+          
+  - name: initiative_service
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: initiative_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: initiative-service
+                port_value: 5005
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "/etc/envoy/certs/envoy.crt" }
+            private_key: { filename: "/etc/envoy/certs/envoy.key" }
+          validation_context:
+            trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+    health_checks:
+      - timeout: 1s
+        interval: 10s
+        unhealthy_threshold: 3
+        healthy_threshold: 3
+        http_health_check:
+          path: "/health"
+  
+  - name: jaeger
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: jaeger
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: jaeger-service
+                port_value: 9411

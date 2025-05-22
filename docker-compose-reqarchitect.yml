@@ -1,0 +1,737 @@
+version: '3.8'
+
+# This docker-compose file defines all services for the ReqArchitect system
+# It extends the enhanced architecture with additional services specific to ReqArchitect
+
+services:
+  #############################################
+  # Infrastructure Services
+  #############################################
+  
+  # Service mesh proxy (Envoy)
+  envoy:
+    image: envoyproxy/envoy:v1.24-latest
+    ports:
+      - "9901:9901"  # Admin interface
+      - "10000:10000"  # API Gateway entry point
+    volumes:
+      - ./service_mesh/envoy.yaml:/etc/envoy/envoy.yaml
+    networks:
+      - reqarchitect
+    depends_on:
+      - consul
+      - jaeger
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9901/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Service discovery
+  consul:
+    image: consul:1.15
+    ports:
+      - "8500:8500"  # UI and HTTP API
+      - "8600:8600/udp"  # DNS interface
+    command: "agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0"
+    volumes:
+      - consul_data:/consul/data
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.40
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # UI port
+      - "14268:14268"  # Collector HTTP port
+      - "14250:14250"  # Collector gRPC port
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=9411
+    networks:
+      - reqarchitect
+
+  # Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - reqarchitect
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Grafana dashboards
+  grafana:
+    image: grafana/grafana:9.5.2
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - reqarchitect
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL database for services
+  # Using separate databases per service for isolation
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_MULTIPLE_DATABASES=strategy_service,business_layer_service,application_layer_service,technology_layer_service,motivation_service,implementation_migration_service,ai_orchestrator_service,ai_assistant_service,validation_service,auth_service,kpi_service,initiative_service,business_case_service,canvas_service,subscription_service,integration_service,cost_service
+    volumes:
+      - ./scripts/init-multiple-postgres-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-postgres-dbs.sh
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  #############################################
+  # Product Discovery Layer
+  #############################################
+
+  # KPI Service
+  kpi-service:
+    build:
+      context: ./kpi_service
+      dockerfile: Dockerfile
+    ports:
+      - "5004:5004"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=kpi_service
+      - SERVICE_PORT=5004
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/kpi_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Initiative Service
+  initiative-service:
+    build:
+      context: ./initiative_service
+      dockerfile: Dockerfile
+    ports:
+      - "5005:5005"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=initiative_service
+      - SERVICE_PORT=5005
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/initiative_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Business Model Canvas Service
+  canvas-service:
+    build:
+      context: ./canvas_service
+      dockerfile: Dockerfile
+    ports:
+      - "5006:5006"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=canvas_service
+      - SERVICE_PORT=5006
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/canvas_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Business Case Service
+  business-case-service:
+    build:
+      context: ./business_case_service
+      dockerfile: Dockerfile
+    ports:
+      - "5007:5007"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=business_case_service
+      - SERVICE_PORT=5007
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/business_case_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5007/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  #############################################
+  # Transformation & Code Generation Pipeline
+  #############################################
+
+  # Strategy Service
+  strategy-service:
+    build:
+      context: ./strategy_service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=strategy_service
+      - SERVICE_PORT=5001
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/strategy_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+      - AI_ORCHESTRATOR_SERVICE_URL=http://ai-orchestrator-service:5100
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - ai-assistant-service
+      - ai-orchestrator-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Business Layer Service
+  business-layer-service:
+    build:
+      context: ./business_layer_service
+      dockerfile: Dockerfile
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=business_layer_service
+      - SERVICE_PORT=5002
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/business_layer_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+      - AI_ORCHESTRATOR_SERVICE_URL=http://ai-orchestrator-service:5100
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - ai-assistant-service
+      - ai-orchestrator-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Application Layer Service
+  application-layer-service:
+    build:
+      context: ./application_layer_service
+      dockerfile: Dockerfile
+    ports:
+      - "5003:5003"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=application_layer_service
+      - SERVICE_PORT=5003
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/application_layer_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+      - AI_ORCHESTRATOR_SERVICE_URL=http://ai-orchestrator-service:5100
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - ai-assistant-service
+      - ai-orchestrator-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Technology Layer Service
+  technology-layer-service:
+    build:
+      context: ./technology_layer_service
+      dockerfile: Dockerfile
+    ports:
+      - "5008:5008"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=technology_layer_service
+      - SERVICE_PORT=5008
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/technology_layer_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+      - AI_ORCHESTRATOR_SERVICE_URL=http://ai-orchestrator-service:5100
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - ai-assistant-service
+      - ai-orchestrator-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Motivation Service
+  motivation-service:
+    build:
+      context: ./motivation_service
+      dockerfile: Dockerfile
+    ports:
+      - "5009:5009"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=motivation_service
+      - SERVICE_PORT=5009
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/motivation_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+      - AI_ORCHESTRATOR_SERVICE_URL=http://ai-orchestrator-service:5100
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - ai-assistant-service
+      - ai-orchestrator-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5009/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Implementation Migration Service
+  implementation-migration-service:
+    build:
+      context: ./implementation_migration_service
+      dockerfile: Dockerfile
+    ports:
+      - "5010:5010"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=implementation_migration_service
+      - SERVICE_PORT=5010
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/implementation_migration_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+      - AI_ORCHESTRATOR_SERVICE_URL=http://ai-orchestrator-service:5100
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - ai-assistant-service
+      - ai-orchestrator-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5010/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  #############################################
+  # AI Services
+  #############################################
+
+  # AI Orchestrator Service
+  ai-orchestrator-service:
+    build:
+      context: ./ai_orchestrator_service
+      dockerfile: Dockerfile
+    ports:
+      - "5100:5100"
+    environment:
+      - FLASK_ENV=production
+      - SERVICE_PORT=5100
+      - DATABASE_URL=postgresql://postgres:password@ai-orchestrator-db:5432/ai_orchestrator_service
+      - CONSUL_HOST=consul
+      - JAEGER_HOST=jaeger
+      - PROMETHEUS_MULTIPROC_DIR=/tmp
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecret}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - HF_API_KEY=${HF_API_KEY:-}
+    volumes:
+      - ./ai_orchestrator_service:/app
+    networks:
+      - reqarchitect
+    depends_on:
+      - consul
+      - jaeger
+      - ai-orchestrator-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Orchestrator Service Database
+  ai-orchestrator-db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ai_orchestrator_service
+    volumes:
+      - ai_orchestrator_db_data:/var/lib/postgresql/data
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # AI Assistant Service
+  ai-assistant-service:
+    build:
+      context: ./ai_assistant_service
+      dockerfile: Dockerfile
+    ports:
+      - "5200:5200"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=ai_assistant_service
+      - SERVICE_PORT=5200
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_assistant_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5200/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # CodeLlama Service - Local LLM for code generation
+  codellama-service:
+    image: codellama:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - codellama_data:/data
+    environment:
+      - MODEL_PATH=/data/codellama-7b-instruct
+      - MAX_TOKENS=2048
+      - MAX_BATCH_SIZE=4
+    networks:
+      - reqarchitect
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Validation Service
+  validation-service:
+    build:
+      context: ./validation_service
+      dockerfile: Dockerfile
+    ports:
+      - "5300:5300"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=validation_service
+      - SERVICE_PORT=5300
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/validation_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5300/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  #############################################
+  # Operational Modules
+  #############################################
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=auth_service
+      - SERVICE_PORT=5000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/auth_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Subscription Billing Module
+  subscription-service:
+    build:
+      context: ./subscription_service
+      dockerfile: Dockerfile
+    ports:
+      - "5400:5400"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=subscription_service
+      - SERVICE_PORT=5400
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/subscription_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - auth-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5400/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Integration Hub
+  integration-service:
+    build:
+      context: ./integration_service
+      dockerfile: Dockerfile
+    ports:
+      - "5500:5500"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=integration_service
+      - SERVICE_PORT=5500
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/integration_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - auth-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5500/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Cost Estimation & TCO Calculator
+  cost-service:
+    build:
+      context: ./cost_service
+      dockerfile: Dockerfile
+    ports:
+      - "5600:5600"
+    environment:
+      - FLASK_ENV=development
+      - SERVICE_NAME=cost_service
+      - SERVICE_PORT=5600
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cost_service
+      - JWT_SECRET_KEY=your-secret-key
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+      - TRACING_ENABLED=true
+      - AI_ASSISTANT_SERVICE_URL=http://ai-assistant-service:5200
+    depends_on:
+      - postgres
+      - consul
+      - jaeger
+      - auth-service
+      - ai-assistant-service
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5600/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  reqarchitect:
+    driver: bridge
+
+volumes:
+  consul_data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+  codellama_data:

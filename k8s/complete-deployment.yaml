@@ -1,0 +1,459 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reqarchitect
+
+---
+# ===== ConfigMaps and Secrets =====
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: common-config
+  namespace: reqarchitect
+data:
+  JWT_SECRET_KEY: "use-kubernetes-secrets-in-production"
+  CONSUL_HOST: "consul-service"
+  CONSUL_PORT: "8500"
+  JAEGER_HOST: "jaeger-service"
+  JAEGER_PORT: "6831"
+  TRACING_ENABLED: "true"
+  CIRCUIT_BREAKER_ENABLED: "true"
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: "5"
+  CIRCUIT_BREAKER_RECOVERY_TIMEOUT: "30"
+  OUTBOX_ENABLED: "true"
+  OUTBOX_PROCESSING_INTERVAL: "10"
+  OUTBOX_MAX_RETRY: "3"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: reqarchitect
+type: Opaque
+data:
+  POSTGRES_USER: cG9zdGdyZXM=  # postgres
+  POSTGRES_PASSWORD: cGFzc3dvcmQ=  # password
+
+---
+# ===== Infrastructure Services =====
+# Consul Service Registry
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: consul
+  namespace: reqarchitect
+spec:
+  serviceName: consul-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consul
+  template:
+    metadata:
+      labels:
+        app: consul
+    spec:
+      containers:
+      - name: consul
+        image: consul:1.15
+        args:
+          - "agent"
+          - "-server"
+          - "-ui"
+          - "-node=server-1"
+          - "-bootstrap-expect=1"
+          - "-client=0.0.0.0"
+        ports:
+        - containerPort: 8500
+          name: http
+        - containerPort: 8600
+          name: dns
+        volumeMounts:
+        - name: consul-data
+          mountPath: /consul/data
+  volumeClaimTemplates:
+  - metadata:
+      name: consul-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consul-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: consul
+  ports:
+  - port: 8500
+    targetPort: 8500
+    name: http
+  - port: 8600
+    targetPort: 8600
+    protocol: UDP
+    name: dns
+
+---
+# Jaeger Distributed Tracing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: reqarchitect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.40
+        ports:
+        - containerPort: 5775
+          name: udp-5775
+        - containerPort: 6831
+          name: udp-6831
+        - containerPort: 6832
+          name: udp-6832
+        - containerPort: 5778
+          name: http-5778
+        - containerPort: 16686
+          name: http-ui
+        - containerPort: 14268
+          name: http-coll
+        - containerPort: 14250
+          name: grpc-coll
+        env:
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - port: 5775
+    targetPort: 5775
+    protocol: UDP
+    name: udp-5775
+  - port: 6831
+    targetPort: 6831
+    protocol: UDP
+    name: udp-6831
+  - port: 6832
+    targetPort: 6832
+    protocol: UDP
+    name: udp-6832
+  - port: 5778
+    targetPort: 5778
+    name: http-5778
+  - port: 16686
+    targetPort: 16686
+    name: http-ui
+  - port: 14268
+    targetPort: 14268
+    name: http-coll
+  - port: 14250
+    targetPort: 14250
+    name: grpc-coll
+
+---
+# Envoy API Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy
+  namespace: reqarchitect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+    spec:
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:v1.24-latest
+        ports:
+        - containerPort: 9901
+          name: admin
+        - containerPort: 10000
+          name: http
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: envoy-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: envoy
+  ports:
+  - port: 9901
+    targetPort: 9901
+    name: admin
+  - port: 10000
+    targetPort: 10000
+    name: http
+  type: LoadBalancer
+
+---
+# ===== Application Databases =====
+# Strategy Service Database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: strategy-db
+  namespace: reqarchitect
+spec:
+  serviceName: strategy-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: strategy-db
+  template:
+    metadata:
+      labels:
+        app: strategy-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "strategy_service"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: strategy-db-data
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: strategy-db-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: strategy-db-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: strategy-db
+  ports:
+  - port: 5432
+    targetPort: 5432
+
+---
+# ===== Application Services =====
+# Strategy Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: strategy-service
+  namespace: reqarchitect
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: strategy-service
+  template:
+    metadata:
+      labels:
+        app: strategy-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "5001"
+    spec:
+      containers:
+      - name: strategy-service
+        image: your-registry/strategy-service:latest  # Replace with your image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        env:
+        - name: SERVICE_NAME
+          value: "strategy_service"
+        - name: SERVICE_PORT
+          value: "5001"
+        - name: API_VERSION
+          value: "v1"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@strategy-db-service:5432/strategy_service"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: JWT_SECRET_KEY
+        - name: CONSUL_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: CONSUL_HOST
+        - name: CONSUL_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: CONSUL_PORT
+        - name: JAEGER_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: JAEGER_HOST
+        - name: JAEGER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: JAEGER_PORT
+        - name: TRACING_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: TRACING_ENABLED
+        - name: CIRCUIT_BREAKER_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: CIRCUIT_BREAKER_ENABLED
+        - name: CIRCUIT_BREAKER_FAILURE_THRESHOLD
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: CIRCUIT_BREAKER_FAILURE_THRESHOLD
+        - name: CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+        - name: OUTBOX_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: OUTBOX_ENABLED
+        - name: OUTBOX_PROCESSING_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: OUTBOX_PROCESSING_INTERVAL
+        - name: OUTBOX_MAX_RETRY
+          valueFrom:
+            configMapKeyRef:
+              name: common-config
+              key: OUTBOX_MAX_RETRY
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: strategy-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: strategy-service
+  ports:
+  - port: 5001
+    targetPort: 5001
+
+---
+# Horizontal Pod Autoscaler for Strategy Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: strategy-service-hpa
+  namespace: reqarchitect
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: strategy-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+---
+# Similar deployments would be created for other services:
+# - business_layer_service
+# - user_service
+# - auth_service 
+# - initiative_service
+# - kpi_service
+# - business_case_service
+# Each with their own database StatefulSet

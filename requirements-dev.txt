@@ -1,0 +1,8 @@
+flake8
+black
+bandit
+mypy
+pip-audit
+detect-secrets
+pytest-cov
+openapi-spec-validator 

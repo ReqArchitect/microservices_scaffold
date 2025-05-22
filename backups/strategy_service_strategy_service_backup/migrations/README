@@ -1,0 +1,1 @@
+# Empty for now. Place Alembic migration scripts here after running flask db init/migrate.
