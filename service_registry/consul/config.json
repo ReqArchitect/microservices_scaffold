@@ -1,0 +1,46 @@
+{
+  "datacenter": "reqarchitect",
+  "data_dir": "/consul/data",
+  "log_level": "INFO",
+  "node_name": "server-1",
+  "server": true,
+  "ui_config": {
+    "enabled": true
+  },
+  "telemetry": {
+    "disable_hostname": true,
+    "prometheus_retention_time": "24h"
+  },
+  "performance": {
+    "raft_multiplier": 1
+  },
+  "connect": {
+    "enabled": true
+  },
+  "service": {
+    "name": "consul",
+    "tags": ["reqarchitect", "service-registry"],
+    "port": 8500,
+    "check": {
+      "id": "consul-http",
+      "name": "Consul HTTP API",
+      "http": "http://localhost:8500/v1/status/leader",
+      "method": "GET",
+      "interval": "10s",
+      "timeout": "5s"
+    }
+  },
+  "watches": [
+    {
+      "type": "service",
+      "service": "redis",
+      "handler_type": "script",
+      "args": ["/consul/scripts/cache-update.sh"]
+    }
+  ],
+  "key_prefix": {
+    "reqarchitect/": {
+      "policy": "write"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "telemetry": {
+    "prometheus_retention_time": "24h",
+    "disable_hostname": false,
+    "enable_hostname_label": true,
+    "filter_default": false,
+    "prefix_filter": [
+      "+consul.raft.apply",
+      "+consul.raft.barrier",
+      "+consul.raft.replication",
+      "+consul.raft.leader",
+      "+consul.rpc.accept_conn",
+      "+consul.catalog.register",
+      "+consul.catalog.deregister",
+      "+consul.kvs.apply",
+      "+consul.session.apply",
+      "+consul.dns.domain_query",
+      "+consul.http",
+      "+consul.serf.events",
+      "+consul.serf.member.join",
+      "+consul.serf.member.leave"
+    ],
+    "metrics_prefix": "consul",
+    "statsd_address": "",
+    "dogstatsd_addr": "",
+    "circonus_api_token": "",
+    "circonus_api_app": "",
+    "circonus_api_url": "",
+    "circonus_submission_interval": "",
+    "circonus_submission_url": "",
+    "circonus_check_id": "",
+    "circonus_check_force_metric_activation": "",
+    "circonus_check_instance_id": "",
+    "circonus_check_search_tag": "",
+    "circonus_broker_id": "",
+    "circonus_broker_select_tag": ""
+  },
+  "ui_config": {
+    "metrics_provider": "prometheus",
+    "metrics_proxy": {
+      "base_url": "http://prometheus:9090"
+    },
+    "dashboard_url_templates": {
+      "service": "http://grafana:3000/d/consul-service/service-metrics?var-service={{Service.Name}}"
+    }
+  }
+}

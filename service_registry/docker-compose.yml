@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  consul:
+    image: consul:1.15
+    ports:
+      - "8500:8500"      # HTTP API & UI
+      - "8600:8600/udp"  # DNS Interface
+      - "8300:8300"      # Server RPC
+      - "8301:8301"      # Serf LAN
+      - "8302:8302"      # Serf WAN      - "8443:8443"      # HTTPS API    command: agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0 -config-dir=/consul/config -log-level=INFO -telemetry-prometheus-retention-time=24h -telemetry-enable-hostname=true -enable-metrics -encrypt=${CONSUL_GOSSIP_ENCRYPTION_KEY} -tls-server-name=consul.service.consul -retry-join="consul.service.consul"
+    environment:
+      - CONSUL_ALLOW_PRIVILEGED_PORTS=true
+      - CONSUL_HTTP_ADDR=0.0.0.0:8500
+      - CONSUL_ENABLE_SCRIPT_CHECKS=true
+      - CONSUL_LOG_LEVEL=INFO
+      - CONSUL_CONNECT_ENABLED=true
+      - CONSUL_TLS_VERIFY=true
+      - CONSUL_HTTP_TOKEN=${CONSUL_HTTP_TOKEN}
+      - CONSUL_TELEMETRY_DISABLE_HOSTNAME=false
+      - CONSUL_TELEMETRY_PROMETHEUS_RETENTION_TIME=24h
+      - CONSUL_UI_METRICS_PROVIDER=prometheus
+      - CONSUL_UI_METRICS_RETENTION=24h
+      - CONSUL_ACL_DEFAULT_POLICY=deny
+      - CONSUL_ACL_DOWN_POLICY=extend-cache
+      - CONSUL_CONNECT_ENABLED=true
+      - CONSUL_TELEMETRY_METRICS_PREFIX=reqarchitect
+      - CONSUL_TLS_VERIFY=true
+      - CONSUL_HTTP_TOKEN=${CONSUL_HTTP_TOKEN}
+      - CONSUL_GOSSIP_ENCRYPTION_KEY=${CONSUL_GOSSIP_ENCRYPTION_KEY}
+    volumes:
+      - consul_data:/consul/data
+      - consul_config:/consul/config
+      - ./config:/consul/config-local:ro    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "consul", "operator", "raft", "list-peers"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+volumes:
+  consul_data:
+  consul_config:
+
+networks:
+  reqarchitect:
+    external: true

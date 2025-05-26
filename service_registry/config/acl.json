@@ -1,0 +1,40 @@
+{
+  "acl": {
+    "enabled": true,
+    "default_policy": "deny",
+    "down_policy": "extend-cache",
+    "tokens": {
+      "master": "your-secure-master-token-here",
+      "agent": "your-secure-agent-token-here"
+    }
+  },
+  "telemetry": {
+    "disable_hostname": false,
+    "prometheus_retention_time": "24h",
+    "prefix_filter": ["+consul.raft", "+consul.rpc"],
+    "filter_default": true
+  },
+  "performance": {
+    "raft_multiplier": 1
+  },
+  "limits": {
+    "http_max_conns_per_client": 200,
+    "rpc_max_conns_per_client": 100
+  },
+  "auto_config": {
+    "authorization": {
+      "enabled": true,
+      "static": {
+        "oidc_discovery_url": "",
+        "bound_issuer": "",
+        "bound_audiences": [],
+        "claim_mappings": {
+          "team": "team"
+        },
+        "list_claim_mappings": {
+          "roles": "roles"
+        }
+      }
+    }
+  }
+}

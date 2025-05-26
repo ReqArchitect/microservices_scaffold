@@ -1,0 +1,5 @@
+Flask
+Flask-SQLAlchemy
+boto3
+openpyxl
+Pillow

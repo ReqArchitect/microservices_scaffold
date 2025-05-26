@@ -1,0 +1,307 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reqarchitect
+---
+# ConfigMap for common configurations
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: common-config
+  namespace: reqarchitect
+data:
+  JWT_SECRET_KEY: "use-kubernetes-secrets-in-production-environment"
+  CONSUL_HOST: "consul-service"
+  CONSUL_PORT: "8500"
+  JAEGER_HOST: "jaeger-service"
+  JAEGER_PORT: "6831"
+  TRACING_ENABLED: "true"
+---
+# Secrets for database credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: reqarchitect
+type: Opaque
+data:
+  # Note: In real production, set these properly via a secret management system
+  # These are base64 encoded "postgres" and "password"
+  POSTGRES_USER: cG9zdGdyZXM=
+  POSTGRES_PASSWORD: cGFzc3dvcmQ=
+---
+# Service discovery (Consul)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: consul
+  namespace: reqarchitect
+spec:
+  serviceName: consul-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consul
+  template:
+    metadata:
+      labels:
+        app: consul
+    spec:
+      containers:
+      - name: consul
+        image: consul:1.15
+        args:
+          - "agent"
+          - "-server"
+          - "-ui"
+          - "-node=server-1"
+          - "-bootstrap-expect=1"
+          - "-client=0.0.0.0"
+        ports:
+        - containerPort: 8500
+          name: http
+        - containerPort: 8600
+          name: dns
+        volumeMounts:
+        - name: consul-data
+          mountPath: /consul/data
+  volumeClaimTemplates:
+  - metadata:
+      name: consul-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consul-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: consul
+  ports:
+  - port: 8500
+    targetPort: 8500
+    name: http
+  - port: 8600
+    targetPort: 8600
+    protocol: UDP
+    name: dns
+---
+# Distributed tracing (Jaeger)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: reqarchitect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.40
+        ports:
+        - containerPort: 5775
+          name: udp-5775
+        - containerPort: 6831
+          name: udp-6831
+        - containerPort: 6832
+          name: udp-6832
+        - containerPort: 5778
+          name: http-5778
+        - containerPort: 16686
+          name: http-ui
+        - containerPort: 14268
+          name: http-coll
+        - containerPort: 14250
+          name: grpc-coll
+        env:
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - port: 5775
+    targetPort: 5775
+    protocol: UDP
+    name: udp-5775
+  - port: 6831
+    targetPort: 6831
+    protocol: UDP
+    name: udp-6831
+  - port: 6832
+    targetPort: 6832
+    protocol: UDP
+    name: udp-6832
+  - port: 5778
+    targetPort: 5778
+    name: http-5778
+  - port: 16686
+    targetPort: 16686
+    name: http-ui
+  - port: 14268
+    targetPort: 14268
+    name: http-coll
+  - port: 14250
+    targetPort: 14250
+    name: grpc-coll
+---
+# Service Mesh (Envoy)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy
+  namespace: reqarchitect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+    spec:
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:v1.24-latest
+        ports:
+        - containerPort: 9901
+          name: admin
+        - containerPort: 10000
+          name: http
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: envoy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-service
+  namespace: reqarchitect
+spec:
+  selector:
+    app: envoy
+  ports:
+  - port: 9901
+    targetPort: 9901
+    name: admin
+  - port: 10000
+    targetPort: 10000
+    name: http
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-config
+  namespace: reqarchitect
+data:
+  envoy.yaml: |
+    admin:
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 9901 }
+    
+    static_resources:
+      listeners:
+      - name: listener_0
+        address:
+          socket_address: { address: 0.0.0.0, port_value: 10000 }
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: ingress_http
+              access_log:
+              - name: envoy.access_loggers.stdout
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+              route_config:
+                name: local_route
+                virtual_hosts:
+                - name: app
+                  domains: ["*"]
+                  routes:
+                  # Strategy Service Routes
+                  - match:
+                      prefix: "/api/v1/capabilities"
+                    route:
+                      prefix_rewrite: "/api/v1/capabilities"
+                      cluster: strategy_service
+                      timeout: 30s
+                  # Other service routes would be defined here
+              
+              http_filters:
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+              tracing:
+                provider:
+                  name: envoy.tracers.zipkin
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+                    collector_cluster: jaeger
+                    collector_endpoint: "/api/v2/spans"
+                    shared_span_context: false
+                    collector_endpoint_version: HTTP_JSON
+    
+      clusters:
+      - name: strategy_service
+        connect_timeout: 0.25s
+        type: STRICT_DNS
+        dns_lookup_family: V4_ONLY
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: strategy_service
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: strategy-service
+                    port_value: 5001
+        health_checks:
+          - timeout: 1s
+            interval: 10s
+            unhealthy_threshold: 3
+            healthy_threshold: 3
+            http_health_check:
+              path: "/health"
+              
+      # Other service clusters would be defined here
+      
+      - name: jaeger
+        connect_timeout: 0.25s
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: jaeger
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: jaeger-service
+                    port_value: 9411

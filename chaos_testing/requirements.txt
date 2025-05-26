@@ -1,0 +1,5 @@
+# chaos_testing/requirements.txt
+chaostoolkit==1.13.0
+chaostoolkit-kubernetes==0.35.0
+chaostoolkit-prometheus==0.5.0
+chaostoolkit-slack==0.1.1

@@ -1,0 +1,124 @@
+{
+    "version": "1.0.0",
+    "title": "Service Resiliency Test",
+    "description": "Verify services can withstand infrastructure failures",
+    "tags": ["microservice", "kubernetes", "resilience"],
+    "configuration": {
+        "prometheus_base_url": {
+            "type": "string",
+            "default": "http://prometheus-service:9090"
+        },
+        "k8s_namespace": {
+            "type": "string", 
+            "default": "reqarchitect"
+        }
+    },
+    "steady-state-hypothesis": {
+        "title": "Services are available and healthy",
+        "probes": [
+            {
+                "type": "probe",
+                "name": "all-services-are-healthy",
+                "tolerance": true,
+                "provider": {
+                    "type": "python",
+                    "module": "chaosk8s.probes",
+                    "func": "deployment_is_not_fully_available",
+                    "arguments": {
+                        "name": "strategy-service",
+                        "ns": "${k8s_namespace}",
+                        "timeout": 3,
+                        "negate_result": true
+                    }
+                }
+            },
+            {
+                "type": "probe",
+                "name": "app-responds-with-proper-status",
+                "tolerance": 200,
+                "provider": {
+                    "type": "http",
+                    "url": "http://envoy-service:10000/api/v1/capabilities",
+                    "timeout": 3,
+                    "method": "GET",
+                    "status_code": 200
+                }
+            }
+        ]
+    },
+    "method": [
+        {
+            "type": "action",
+            "name": "terminate-strategy-service-pod",
+            "provider": {
+                "type": "python",
+                "module": "chaosk8s.pod.actions",
+                "func": "terminate_random_pods",
+                "arguments": {
+                    "label_selector": "app=strategy-service",
+                    "ns": "${k8s_namespace}",
+                    "rand": true,
+                    "qty": 1
+                }
+            },
+            "pauses": {
+                "after": 10
+            }
+        },
+        {
+            "type": "probe",
+            "name": "check-service-response-after-pod-failure",
+            "tolerance": 200,
+            "provider": {
+                "type": "http",
+                "url": "http://envoy-service:10000/api/v1/capabilities",
+                "timeout": 3,
+                "method": "GET"
+            }
+        },
+        {
+            "type": "action",
+            "name": "add-network-latency",
+            "provider": {
+                "type": "python",
+                "module": "chaosk8s.networking.actions",
+                "func": "add_network_latency",
+                "arguments": {
+                    "label_selector": "app=business-layer-service",
+                    "ns": "${k8s_namespace}",
+                    "delay": "200ms",
+                    "jitter": "50ms"
+                }
+            },
+            "pauses": {
+                "after": 15
+            }
+        },
+        {
+            "type": "probe",
+            "name": "check-service-response-with-latency",
+            "tolerance": 200,
+            "provider": {
+                "type": "http",
+                "url": "http://envoy-service:10000/api/v1/business/dashboard",
+                "timeout": 5,
+                "method": "GET"
+            }
+        }
+    ],
+    "rollbacks": [
+        {
+            "type": "action",
+            "name": "remove-network-latency",
+            "provider": {
+                "type": "python",
+                "module": "chaosk8s.networking.actions",
+                "func": "remove_network_latency",
+                "arguments": {
+                    "label_selector": "app=business-layer-service",
+                    "ns": "${k8s_namespace}"
+                }
+            }
+        }
+    ]
+}
