@@ -2,7 +2,7 @@
 # These requirements are for the enhanced features of the microservices architecture
 
 # Monitoring and Observability
-prometheus-client==0.16.0
+prometheus-client==0.22.0
 opentelemetry-api==1.16.0
 opentelemetry-sdk==1.16.0
 opentelemetry-instrumentation-flask==0.37b0
