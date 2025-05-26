@@ -53,4 +53,18 @@ jobs:
           pip install schemathesis
           for spec in $(find . -name 'openapi*.yaml'); do
             schemathesis run $spec || exit 1
-          done 
+          done
+      - name: Run Bandit security scan
+        run: bandit -r .
+      - name: Run contract tests
+        run: make contract-test
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: htmlcov/
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: .pytest_cache/ 

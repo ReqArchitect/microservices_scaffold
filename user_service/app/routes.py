@@ -532,3 +532,5 @@ def handle_validation_error(error):
 @user_blueprint.errorhandler(Exception)
 def handle_general_error(error):
     return jsonify({"message": str(error)}), 500
+
+# TODO: Add advanced chaos/fault injection hooks where feasible.

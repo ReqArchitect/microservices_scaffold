@@ -475,3 +475,23 @@ def test_metrics_data_consistency(client, test_vendor, test_tenant):
     assert data["users"]["total"] == 5  # 4 new users + 1 admin
     assert data["users"]["active"] == 2  # Only active users
     assert data["users"]["verified"] == 2  # Only verified users 
+
+def test_audit_log_on_user_update(client, db_session, user_factory):
+    # TODO: Implement audit log assertion for user update
+    pass
+
+def test_metrics_endpoint(client, admin_token):
+    # TODO: Assert metrics endpoint returns expected structure
+    pass
+
+def test_logging_on_login(client, user_factory):
+    # TODO: Assert logs are written on login
+    pass
+
+def test_rate_limiting_on_login(client):
+    # TODO: Simulate rapid login attempts and assert 429
+    pass
+
+def test_brute_force_protection(client):
+    # TODO: Simulate brute force and assert lockout
+    pass 

@@ -43,3 +43,21 @@ def auth_header_factory(app):
             'Content-Type': 'application/json'
         }
     return _make
+
+@pytest.fixture
+def log_capture():
+    # TODO: Implement log capture fixture
+    pass
+
+@pytest.fixture
+def audit_log_capture():
+    # TODO: Implement audit log capture fixture
+    pass
+
+@pytest.fixture(params=["vendor_admin", "tenant_admin", "user"])
+def rbac_role(request):
+    return request.param
+
+@pytest.fixture(params=[1, 2])
+def tenant_id(request):
+    return request.param

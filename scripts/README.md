@@ -11,4 +11,12 @@ This directory contains all utility and automation scripts for the monorepo.
 - `setup_code_quality.py`: Setup code quality tools
 - `setup_local_env.py`: Setup local development environment
 
+## Test Data Scripts
+- `seed_test_data.py`: Seeds test data for all services
+- `cleanup_test_data.py`: Cleans up test data after tests
+
+## Contract and Chaos Testing
+- `run_contract_tests.py`: Runs contract tests using Schemathesis/Dredd
+- `run_chaos_tests.py`: Runs chaos/fault injection tests
+
 All scripts are invoked from this directory. See each script for usage details. 

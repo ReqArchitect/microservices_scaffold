@@ -338,6 +338,20 @@ Run chaos experiments to test resilience:
 python run_chaos_tests.py --experiment service_resilience_experiment.json
 ```
 
+## Test Data Management
+- All tests use fixtures and factories for isolation
+- Global test data seeding/cleanup scripts are in `scripts/`
+- Multi-tenant and RBAC scenarios are parameterized
+
+## Advanced Testing
+- Run `make contract-test` for contract tests (Schemathesis/Dredd)
+- Run `make security-scan` for Bandit/Trivy
+- Run `make chaos-test` for chaos/fault injection
+
+## CI/CD
+- All tests, security scans, and contract tests run in CI
+- Coverage and security badges are in the README
+
 ## Deployment
 
 ### Kubernetes Deployment

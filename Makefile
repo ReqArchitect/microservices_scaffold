@@ -30,4 +30,13 @@ lint:
 	flake8 .
 	black --check .
 	isort --check-only .
-	mypy . 
+	mypy .
+
+contract-test:
+	schemathesis run docs/api-spec.yaml --base-url=http://localhost:5000
+
+security-scan:
+	bandit -r .
+
+chaos-test:
+	pytest --chaos 

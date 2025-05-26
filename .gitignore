@@ -63,4 +63,11 @@ node_modules/
 # Remove/ignore redundant folders
 performance/
 chaos_testing/
-tools/ 
+tools/
+
+# Ignore legacy/backup test folders
+backups/*/tests/
+backups/*/venv/
+# Ignore test artifacts
+htmlcov/
+pytest_cache/ 
