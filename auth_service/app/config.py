@@ -4,10 +4,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('AUTH_SERVICE_DATABASE_URL')
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+REDIS_URL = os.environ.get('REDIS_URL')
+
 class Config:
     """Base configuration."""
     # Database
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:password@localhost:5432/auth_service")
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
@@ -16,7 +20,7 @@ class Config:
     }
 
     # JWT Configuration
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key")
+    JWT_SECRET_KEY = JWT_SECRET_KEY
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
     JWT_TOKEN_LOCATION = ['headers']
@@ -28,7 +32,7 @@ class Config:
 
     # Rate Limiting
     RATELIMIT_ENABLED = True
-    RATELIMIT_STORAGE_URL = os.getenv("REDIS_URL", "memory://")
+    RATELIMIT_STORAGE_URL = REDIS_URL
     RATELIMIT_STRATEGY = "fixed-window"
     RATELIMIT_DEFAULT = "200 per day;50 per hour;10 per minute"
     RATELIMIT_HEADERS_ENABLED = True
@@ -48,7 +52,7 @@ class Config:
 
     # Cache
     CACHE_TYPE = "redis"
-    CACHE_REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    CACHE_REDIS_URL = REDIS_URL
     CACHE_DEFAULT_TIMEOUT = 300
 
     # Metrics

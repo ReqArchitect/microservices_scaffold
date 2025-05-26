@@ -8,11 +8,22 @@ services:
       - "8600:8600/udp"  # DNS Interface
       - "8300:8300"      # Server RPC
       - "8301:8301"      # Serf LAN
+<<<<<<< HEAD
       - "8302:8302"      # Serf WAN      - "8443:8443"      # HTTPS API    command: agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0 -config-dir=/consul/config -log-level=INFO -telemetry-prometheus-retention-time=24h -telemetry-enable-hostname=true -enable-metrics -encrypt=${CONSUL_GOSSIP_ENCRYPTION_KEY} -tls-server-name=consul.service.consul -retry-join="consul.service.consul"
+=======
+      - "8302:8302"      # Serf WAN
+    command: >
+      agent -server -ui 
+      -node=server-1 
+      -bootstrap-expect=1 
+      -client=0.0.0.0
+      -config-dir=/consul/config
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     environment:
       - CONSUL_ALLOW_PRIVILEGED_PORTS=true
       - CONSUL_HTTP_ADDR=0.0.0.0:8500
       - CONSUL_ENABLE_SCRIPT_CHECKS=true
+<<<<<<< HEAD
       - CONSUL_LOG_LEVEL=INFO
       - CONSUL_CONNECT_ENABLED=true
       - CONSUL_TLS_VERIFY=true
@@ -56,6 +67,21 @@ services:
 volumes:
   consul_data:
   consul_config:
+=======
+    volumes:
+      - consul_data:/consul/data
+      - consul_config:/consul/config
+    networks:
+      - reqarchitect
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  consul_data:
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 networks:
   reqarchitect:

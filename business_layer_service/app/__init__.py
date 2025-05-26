@@ -1,4 +1,12 @@
 from flask import Flask
+from common_utils.logging import setup_logging
+from common_utils.db import get_engine, get_session
+from common_utils.cache import get_redis
+from common_utils.auth import init_jwt, init_oauth, rbac_required
+from common_utils.monitoring import init_metrics
+from common_utils.errors import register_error_handlers
+from common_utils.config import load_config
+from common_utils.traceability import log_audit_event
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
@@ -11,6 +19,19 @@ from prometheus_flask_exporter import PrometheusMetrics
 from common_utils.service_registry import ServiceRegistry
 from common_utils.tracing import Tracer
 from common_utils.versioning import VersionedAPI
+
+logger = setup_logging()
+config = load_config()
+
+engine = get_engine('business_layer_service')
+Session = get_session(engine)
+redis_client = get_redis()
+
+app = Flask(__name__)
+jwt = init_jwt(app)
+oauth = init_oauth(app)
+metrics = init_metrics(app)
+register_error_handlers(app)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,10 +46,10 @@ service_registry = ServiceRegistry()
 tracer = Tracer()
 versioned_api = VersionedAPI()
 
-def create_app(config_object=None):
+def create_app(config_name="development"):
     app = Flask(__name__)
-    if config_object:
-        app.config.from_object(config_object)
+    if config_name:
+        app.config.from_object(config_name)
     else:
         app.config.from_object(Config)
 

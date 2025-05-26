@@ -33,8 +33,14 @@ def create_api_blueprint(version):
                 'title': c.title,
                 'description': c.description,
                 'user_id': c.user_id,
+<<<<<<< HEAD
                 'tenant_id': c.tenant_id,                'business_context_id': c.business_context_id,
                 'initiative_context_id': c.initiative_context_id
+=======
+                'tenant_id': c.tenant_id,
+                'business_case_id': c.business_case_id,
+                'initiative_id': c.initiative_id
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
             } for c in capabilities])
         except Exception as e:
             logger.error(f"Error retrieving capabilities: {str(e)}")

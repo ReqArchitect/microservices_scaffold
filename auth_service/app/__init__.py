@@ -20,6 +20,14 @@ from common_utils.service_registry import ServiceRegistry
 from common_utils.tracing import Tracer
 from common_utils.versioning import VersionedAPI
 from prometheus_flask_exporter import PrometheusMetrics
+from common_utils.logging import setup_logging
+from common_utils.db import get_engine, get_session
+from common_utils.cache import get_redis
+from common_utils.auth import init_jwt, init_oauth, rbac_required
+from common_utils.monitoring import init_metrics
+from common_utils.errors import register_error_handlers
+from common_utils.config import load_config
+from common_utils.traceability import log_audit_event
 
 # Initialize extensions
 metrics = PrometheusMetrics.for_app_factory()
@@ -27,7 +35,12 @@ service_registry = ServiceRegistry()
 tracer = Tracer()
 versioned_api = VersionedAPI()
 
+setup_logging()
+config = load_config()
 
+engine = get_engine('auth_service')
+Session = get_session(engine)
+redis_client = get_redis()
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -231,5 +244,7 @@ def create_app(config_name='development'):
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat()
         })
+
+    register_error_handlers(app)
 
     return app 

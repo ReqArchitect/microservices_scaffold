@@ -1,3 +1,5 @@
+# This file is now managed at the repo root. See ../../requirements.txt for all dependencies.
+
 Flask
 Flask-SQLAlchemy
 Flask-Migrate

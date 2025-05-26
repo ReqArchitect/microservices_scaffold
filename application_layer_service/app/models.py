@@ -3,14 +3,19 @@ import datetime
 from common_utils.outbox import OutboxMixin
 from . import db
 
+<<<<<<< HEAD
 class ApplicationComponent(db.Model, OutboxMixin):
     __outbox_enabled__ = True
     
+=======
+class ApplicationComponent(db.Model):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     capability_context_id = db.Column(db.Integer, nullable=True)  # Reference to Capability context
     
     def to_dict(self):
@@ -22,6 +27,8 @@ class ApplicationComponent(db.Model, OutboxMixin):
             'tenant_id': self.tenant_id,
             'capability_context_id': self.capability_context_id
         }
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 class ApplicationCollaboration(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -30,14 +37,19 @@ class ApplicationCollaboration(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
 
+<<<<<<< HEAD
 class ApplicationInterface(db.Model, OutboxMixin):
     __outbox_enabled__ = True
     
+=======
+class ApplicationInterface(db.Model):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     course_of_action_context_id = db.Column(db.Integer, nullable=True)  # Reference to Course of Action context
     
     def to_dict(self):
@@ -49,6 +61,8 @@ class ApplicationInterface(db.Model, OutboxMixin):
             'tenant_id': self.tenant_id,
             'course_of_action_context_id': self.course_of_action_context_id
         }
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 class ApplicationFunction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -64,14 +78,19 @@ class ApplicationInteraction(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
 
+<<<<<<< HEAD
 class ApplicationService(db.Model, OutboxMixin):
     __outbox_enabled__ = True
     
+=======
+class ApplicationService(db.Model):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     capability_context_id = db.Column(db.Integer, nullable=True)  # Reference to Capability context
     
     def to_dict(self):
@@ -83,6 +102,8 @@ class ApplicationService(db.Model, OutboxMixin):
             'tenant_id': self.tenant_id,
             'capability_context_id': self.capability_context_id
         }
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 class DataObject(db.Model):
     id = db.Column(db.Integer, primary_key=True)

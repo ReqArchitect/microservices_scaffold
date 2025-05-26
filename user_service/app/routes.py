@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import (
     create_access_token, jwt_required, get_jwt_identity,
-    create_refresh_token, get_jwt, verify_jwt_in_request
+    create_refresh_token, get_jwt
 )
 from app import db
 from app.models import Tenant, User, UserActivity
@@ -40,6 +40,7 @@ v1_blueprint.register_blueprint(auth_blueprint)
 def role_required(roles):
     def decorator(fn):
         @wraps(fn)
+        @jwt_required()
         def wrapper(*args, **kwargs):
             jwt = get_jwt()
             if jwt.get("role") not in roles:
@@ -78,7 +79,7 @@ def role_required(roles):
         429: {"description": "Too many requests"}
     }
 })
-def register() -> tuple:
+def register():
     start_time = time.time()
     data = request.get_json()
     schema = RegisterRequestSchema()
@@ -94,6 +95,7 @@ def register() -> tuple:
         role=user.role
     ).inc()
     USER_ACTION_LATENCY.labels(action_type='register').observe(time.time() - start_time)
+    log_user_activity(db, user.id, "register", {"tenant_id": user.tenant_id})
     return jsonify({"message": message}), 201
 
 @auth_blueprint.route("/login", methods=["POST"])
@@ -125,7 +127,7 @@ def register() -> tuple:
         429: {"description": "Too many requests"}
     }
 })
-def login() -> tuple:
+def login():
     start_time = time.time()
     data = request.get_json()
     schema = LoginRequestSchema()
@@ -158,12 +160,14 @@ def login() -> tuple:
         role=user.role
     ).inc()
     USER_ACTION_LATENCY.labels(action_type='login').observe(time.time() - start_time)
+    log_user_activity(db, user.id, "login", {"ip": request.remote_addr})
     return jsonify({
         "access_token": access_token,
         "refresh_token": refresh_token
     }), 200
 
 @user_blueprint.route("/me", methods=["GET"])
+@jwt_required()
 @swag_from({
     "tags": ["User"],
     "summary": "Get current user info",
@@ -191,6 +195,7 @@ def get_current_user():
     })
 
 @user_blueprint.route("/me", methods=["PUT"])
+@jwt_required()
 @swag_from({
     "tags": ["User"],
     "summary": "Update current user",
@@ -215,7 +220,7 @@ def get_current_user():
         400: {"description": "Invalid input"}
     }
 })
-def update_current_user() -> tuple:
+def update_current_user():
     user_id, tenant_id = get_identity()
     user = User.query.get(user_id)
     if not user or user.tenant_id != tenant_id:
@@ -226,9 +231,11 @@ def update_current_user() -> tuple:
     if errors:
         return jsonify({"message": "Validation error", "errors": errors}), 400
     success, message = UserService.update_user(user, data)
+    log_user_activity(db, user_id, "update_profile", {"changes": data})
     return jsonify({"message": message})
 
 @user_blueprint.route("/me/activity", methods=["GET"])
+@jwt_required()
 @swag_from({
     "tags": ["User"],
     "summary": "Get user activity",
@@ -253,7 +260,7 @@ def update_current_user() -> tuple:
         404: {"description": "User not found"}
     }
 })
-def get_user_activity() -> tuple:
+def get_user_activity():
     user_id, tenant_id = get_identity()
     user = User.query.get(user_id)
     if not user or user.tenant_id != tenant_id:
@@ -261,12 +268,14 @@ def get_user_activity() -> tuple:
     limit = request.args.get("limit", 10, type=int)
     offset = request.args.get("offset", 0, type=int)
     activities = UserService.get_user_activity(user, limit, offset)
-    return jsonify([{
-        "action": activity.action,
-        "details": activity.details,
-        "ip_address": activity.ip_address,
-        "created_at": activity.created_at.isoformat()
-    } for activity in activities])
+    return jsonify([
+        {
+            "action": activity.action,
+            "details": activity.details,
+            "ip_address": activity.ip_address,
+            "created_at": activity.created_at.isoformat()
+        } for activity in activities
+    ])
 
 @v1_blueprint.route("/health", methods=["GET"])
 @swag_from({
@@ -302,7 +311,6 @@ def refresh():
     user = User.query.get(identity["id"])
     if not user or not user.is_active:
         return jsonify({"message": "Invalid refresh token"}), 401
-
     access_token = create_access_token(identity={
         "id": user.id,
         "tenant_id": user.tenant_id,
@@ -311,6 +319,8 @@ def refresh():
     return jsonify(access_token=access_token)
 
 @user_blueprint.route("", methods=["GET"])
+@jwt_required()
+@role_required(["vendor_admin", "tenant_admin"])
 @swag_from({
     "tags": ["Admin"],
     "summary": "List users",
@@ -372,6 +382,8 @@ def list_users():
     })
 
 @user_blueprint.route("/<int:user_id>", methods=["PUT"])
+@jwt_required()
+@role_required(["vendor_admin", "tenant_admin"])
 @swag_from({
     "tags": ["Admin"],
     "summary": "Update user",
@@ -421,6 +433,8 @@ def update_user(user_id):
     return jsonify({"message": "User updated successfully"})
 
 @user_blueprint.route("/<int:user_id>/activity", methods=["GET"])
+@jwt_required()
+@role_required(["vendor_admin", "tenant_admin"])
 @swag_from({
     "tags": ["Admin"],
     "summary": "Get user activity",
@@ -464,14 +478,18 @@ def get_user_activity_log(user_id):
         .limit(limit)\
         .offset(offset)\
         .all()
-    return jsonify([{
-        "action": activity.action,
-        "details": activity.details,
-        "ip_address": activity.ip_address,
-        "created_at": activity.created_at.isoformat()
-    } for activity in activities])
+    return jsonify([
+        {
+            "action": activity.action,
+            "details": activity.details,
+            "ip_address": activity.ip_address,
+            "created_at": activity.created_at.isoformat()
+        } for activity in activities
+    ])
 
 @user_blueprint.route("/metrics", methods=["GET"])
+@jwt_required()
+@role_required(["vendor_admin"])
 @swag_from({
     "tags": ["System"],
     "summary": "Get service metrics",
@@ -484,12 +502,10 @@ def get_user_activity_log(user_id):
 })
 def get_metrics():
     user_id, tenant_id = get_identity()
-    # Get basic metrics
     total_users = User.query.count()
     active_users = User.query.filter_by(is_active=True).count()
     verified_users = User.query.filter_by(is_email_verified=True).count()
     total_tenants = Tenant.query.count()
-    # Get recent activity
     recent_activities = UserActivity.query\
         .order_by(UserActivity.created_at.desc())\
         .limit(10)\

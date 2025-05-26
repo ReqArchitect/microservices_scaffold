@@ -1,12 +1,16 @@
 import os
 from datetime import timedelta
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('USER_SERVICE_DATABASE_URL')
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+REDIS_URL = os.environ.get('REDIS_URL')
+
 class Config:
     """Base configuration."""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-please-change-in-production'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI or 'sqlite:///app.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key-please-change'
+    JWT_SECRET_KEY = JWT_SECRET_KEY or 'jwt-secret-key-please-change'
     JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1 hour
     JWT_REFRESH_TOKEN_EXPIRES = 604800  # 1 week
     RATELIMIT_STORAGE_URL = os.getenv('RATELIMIT_STORAGE_URL', 'memory://')
@@ -94,8 +98,8 @@ class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
     TESTING = False
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
+    RATELIMIT_STORAGE_URL = REDIS_URL or 'redis://localhost:6379/0'
     RATELIMIT_STORAGE_OPTIONS = {
         'socket_timeout': 5,
         'socket_connect_timeout': 5,

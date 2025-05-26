@@ -5,20 +5,29 @@ from strategy_service.app import create_app, db
 from strategy_service.config import TestConfig
 from flask_jwt_extended import create_access_token
 import pytest
+<<<<<<< HEAD
 import json
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 @pytest.fixture
 def client():
     app = create_app(TestConfig)
     app.config['TESTING'] = True
+<<<<<<< HEAD
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     with app.test_client() as client:
         with app.app_context():
             db.create_all()
         yield client
+<<<<<<< HEAD
         with app.app_context():
             db.session.remove()
             db.drop_all()
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 @pytest.fixture
 def auth_header():
@@ -32,6 +41,7 @@ def auth_header():
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
+<<<<<<< HEAD
 
 def verify_event_emission(db_session, event_type, aggregate_type, aggregate_id=None):
     """Helper to verify an event was emitted"""
@@ -52,3 +62,5 @@ def verify_event_emission(db_session, event_type, aggregate_type, aggregate_id=N
 def verify_context_propagation(payload, context_id_field, expected_value):
     """Helper to verify context IDs are propagated"""
     assert payload.get(context_id_field) == expected_value
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3

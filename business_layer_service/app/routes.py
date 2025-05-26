@@ -6,6 +6,7 @@ from common_utils.responses import success_response, error_response
 from common_utils.http import post_with_jwt
 from common_utils.validation import validate_payload
 from common_utils.ai import call_ai_assistant
+<<<<<<< HEAD
 from .services.business_actor_service import BusinessActorService
 from .services.business_process_service import BusinessProcessService
 from .schemas import BusinessActorCreateSchema, BusinessActorUpdateSchema, BusinessActorResponseSchema, BusinessProcessCreateSchema, BusinessProcessUpdateSchema, BusinessProcessResponseSchema, GoalCreateSchema, GoalUpdateSchema, GoalResponseSchema
@@ -14,6 +15,8 @@ from .services.objective_service import ObjectiveService
 from .schemas import ObjectiveCreateSchema, ObjectiveUpdateSchema, ObjectiveResponseSchema
 from .services.business_role_service import BusinessRoleService
 from .schemas import BusinessRoleCreateSchema, BusinessRoleUpdateSchema, BusinessRoleResponseSchema
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 bp = Blueprint('api', __name__)
 
@@ -27,6 +30,7 @@ def get_user_and_tenant():
 # BusinessActor Endpoints
 @bp.route('/business_actors', methods=['GET'])
 @jwt_required()
+<<<<<<< HEAD
 def get_business_actors() -> tuple:
     actors = BusinessActorService.list()
     schema = BusinessActorResponseSchema(many=True)
@@ -48,10 +52,48 @@ def create_business_actor() -> tuple:
     success, message, actor = BusinessActorService.create(data)
     if not success:
         return error_response(message, 400)
+=======
+def get_business_actors():
+    actors = BusinessActor.query.all()
+    return success_response([{
+        'id': a.id,
+        'name': a.name,
+        'description': a.description,
+        'user_id': a.user_id,
+        'tenant_id': a.tenant_id,
+        'initiative_id': a.initiative_id
+    } for a in actors])
+
+@bp.route('/business_actors', methods=['POST'])
+@jwt_required()
+def create_business_actor():
+    if not request.is_json:
+        return error_response('Request must be JSON', 400)
+    data = request.get_json()
+    if not data.get('name'):
+        return error_response('Missing required field: name', 400)
+    user_id, tenant_id = get_user_and_tenant()
+    payload = {
+        'name': data['name'],
+        'description': data.get('description'),
+        'user_id': user_id,
+        'tenant_id': tenant_id,
+        'initiative_id': data.get('initiative_id')
+    }
+    is_valid, errors = validate_payload(payload, 'business_actor')
+    if not is_valid:
+        return error_response('Validation failed', 400, errors)
+    actor = BusinessActor(**payload)
+    db.session.add(actor)
+    db.session.commit()
+    # Example orchestration: POST to application_layer_service (if needed)
+    # post_with_jwt(os.environ['APPLICATION_LAYER_SERVICE_URL'] + '/application_components', {...}, request.headers.get('Authorization'))
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     return success_response({'id': actor.id}, 201)
 
 @bp.route('/business_actors/<int:actor_id>', methods=['GET'])
 @jwt_required()
+<<<<<<< HEAD
 def get_business_actor(actor_id: int) -> tuple:
     actor = BusinessActorService.get(actor_id)
     if not actor:
@@ -80,11 +122,47 @@ def delete_business_actor(actor_id: int) -> tuple:
     success = BusinessActorService.delete(actor_id)
     if not success:
         return error_response('BusinessActor not found', 404)
+=======
+def get_business_actor(actor_id):
+    actor = BusinessActor.query.get_or_404(actor_id)
+    return jsonify({
+        'id': actor.id,
+        'name': actor.name,
+        'description': actor.description,
+        'user_id': actor.user_id,
+        'tenant_id': actor.tenant_id,
+        'initiative_id': actor.initiative_id
+    })
+
+@bp.route('/business_actors/<int:actor_id>', methods=['PUT'])
+@jwt_required()
+def update_business_actor(actor_id):
+    actor = BusinessActor.query.get_or_404(actor_id)
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    if 'name' in data:
+        actor.name = data['name']
+    if 'description' in data:
+        actor.description = data['description']
+    if 'initiative_id' in data:
+        actor.initiative_id = data['initiative_id']
+    db.session.commit()
+    return jsonify({'id': actor.id})
+
+@bp.route('/business_actors/<int:actor_id>', methods=['DELETE'])
+@jwt_required()
+def delete_business_actor(actor_id):
+    actor = BusinessActor.query.get_or_404(actor_id)
+    db.session.delete(actor)
+    db.session.commit()
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     return '', 204
 
 # BusinessProcess Endpoints
 @bp.route('/business_processes', methods=['GET'])
 @jwt_required(optional=True)
+<<<<<<< HEAD
 def get_business_processes() -> tuple:
     processes = BusinessProcessService.list()
     schema = BusinessProcessResponseSchema(many=True)
@@ -138,11 +216,85 @@ def delete_business_process(process_id: int) -> tuple:
     success = BusinessProcessService.delete(process_id)
     if not success:
         return error_response('BusinessProcess not found', 404)
+=======
+def get_business_processes():
+    processes = BusinessProcess.query.all()
+    return jsonify([{
+        'id': p.id,
+        'name': p.name,
+        'description': p.description,
+        'user_id': p.user_id,
+        'tenant_id': p.tenant_id,
+        'initiative_id': p.initiative_id,
+        'kpi_id': p.kpi_id
+    } for p in processes])
+
+@bp.route('/business_processes', methods=['POST'])
+@jwt_required()
+def create_business_process():
+    if not request.is_json:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    data = request.get_json()
+    if not data.get('name'):
+        return jsonify({'error': 'Missing required field: name'}), 400
+    user_id, tenant_id = get_user_and_tenant()
+    process = BusinessProcess(
+        name=data['name'],
+        description=data.get('description'),
+        user_id=user_id,
+        tenant_id=tenant_id,
+        initiative_id=data.get('initiative_id'),
+        kpi_id=data.get('kpi_id')
+    )
+    db.session.add(process)
+    db.session.commit()
+    return jsonify({'id': process.id}), 201
+
+@bp.route('/business_processes/<int:process_id>', methods=['GET'])
+@jwt_required()
+def get_business_process(process_id):
+    process = BusinessProcess.query.get_or_404(process_id)
+    return jsonify({
+        'id': process.id,
+        'name': process.name,
+        'description': process.description,
+        'user_id': process.user_id,
+        'tenant_id': process.tenant_id,
+        'initiative_id': process.initiative_id,
+        'kpi_id': process.kpi_id
+    })
+
+@bp.route('/business_processes/<int:process_id>', methods=['PUT'])
+@jwt_required()
+def update_business_process(process_id):
+    process = BusinessProcess.query.get_or_404(process_id)
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    if 'name' in data:
+        process.name = data['name']
+    if 'description' in data:
+        process.description = data['description']
+    if 'initiative_id' in data:
+        process.initiative_id = data['initiative_id']
+    if 'kpi_id' in data:
+        process.kpi_id = data['kpi_id']
+    db.session.commit()
+    return jsonify({'id': process.id})
+
+@bp.route('/business_processes/<int:process_id>', methods=['DELETE'])
+@jwt_required()
+def delete_business_process(process_id):
+    process = BusinessProcess.query.get_or_404(process_id)
+    db.session.delete(process)
+    db.session.commit()
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     return '', 204
 
 # Goal Endpoints
 @bp.route('/goals', methods=['GET'])
 @jwt_required(optional=True)
+<<<<<<< HEAD
 def get_goals() -> tuple:
     goals = GoalService.list()
     schema = GoalResponseSchema(many=True)
@@ -196,11 +348,80 @@ def delete_goal(goal_id: int) -> tuple:
     success = GoalService.delete(goal_id)
     if not success:
         return error_response('Goal not found', 404)
+=======
+def get_goals():
+    goals = Goal.query.all()
+    return jsonify([{
+        'id': g.id,
+        'title': g.title,
+        'description': g.description,
+        'user_id': g.user_id,
+        'tenant_id': g.tenant_id,
+        'business_case_id': g.business_case_id
+    } for g in goals])
+
+@bp.route('/goals', methods=['POST'])
+@jwt_required()
+def create_goal():
+    if not request.is_json:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    data = request.get_json()
+    if not data.get('title'):
+        return jsonify({'error': 'Missing required field: title'}), 400
+    user_id, tenant_id = get_user_and_tenant()
+    goal = Goal(
+        title=data['title'],
+        description=data.get('description'),
+        user_id=user_id,
+        tenant_id=tenant_id,
+        business_case_id=data.get('business_case_id')
+    )
+    db.session.add(goal)
+    db.session.commit()
+    return jsonify({'id': goal.id}), 201
+
+@bp.route('/goals/<int:goal_id>', methods=['GET'])
+@jwt_required()
+def get_goal(goal_id):
+    goal = Goal.query.get_or_404(goal_id)
+    return jsonify({
+        'id': goal.id,
+        'title': goal.title,
+        'description': goal.description,
+        'user_id': goal.user_id,
+        'tenant_id': goal.tenant_id,
+        'business_case_id': goal.business_case_id
+    })
+
+@bp.route('/goals/<int:goal_id>', methods=['PUT'])
+@jwt_required()
+def update_goal(goal_id):
+    goal = Goal.query.get_or_404(goal_id)
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    if 'title' in data:
+        goal.title = data['title']
+    if 'description' in data:
+        goal.description = data['description']
+    if 'business_case_id' in data:
+        goal.business_case_id = data['business_case_id']
+    db.session.commit()
+    return jsonify({'id': goal.id})
+
+@bp.route('/goals/<int:goal_id>', methods=['DELETE'])
+@jwt_required()
+def delete_goal(goal_id):
+    goal = Goal.query.get_or_404(goal_id)
+    db.session.delete(goal)
+    db.session.commit()
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     return '', 204
 
 # Objective Endpoints
 @bp.route('/objectives', methods=['GET'])
 @jwt_required(optional=True)
+<<<<<<< HEAD
 def get_objectives() -> tuple:
     objectives = ObjectiveService.list()
     schema = ObjectiveResponseSchema(many=True)
@@ -254,11 +475,80 @@ def delete_objective(objective_id: int) -> tuple:
     success = ObjectiveService.delete(objective_id)
     if not success:
         return error_response('Objective not found', 404)
+=======
+def get_objectives():
+    objectives = Objective.query.all()
+    return jsonify([{
+        'id': o.id,
+        'title': o.title,
+        'description': o.description,
+        'user_id': o.user_id,
+        'tenant_id': o.tenant_id,
+        'goal_id': o.goal_id
+    } for o in objectives])
+
+@bp.route('/objectives', methods=['POST'])
+@jwt_required()
+def create_objective():
+    if not request.is_json:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    data = request.get_json()
+    if not data.get('title'):
+        return jsonify({'error': 'Missing required field: title'}), 400
+    user_id, tenant_id = get_user_and_tenant()
+    objective = Objective(
+        title=data['title'],
+        description=data.get('description'),
+        user_id=user_id,
+        tenant_id=tenant_id,
+        goal_id=data.get('goal_id')
+    )
+    db.session.add(objective)
+    db.session.commit()
+    return jsonify({'id': objective.id}), 201
+
+@bp.route('/objectives/<int:objective_id>', methods=['GET'])
+@jwt_required()
+def get_objective(objective_id):
+    objective = Objective.query.get_or_404(objective_id)
+    return jsonify({
+        'id': objective.id,
+        'title': objective.title,
+        'description': objective.description,
+        'user_id': objective.user_id,
+        'tenant_id': objective.tenant_id,
+        'goal_id': objective.goal_id
+    })
+
+@bp.route('/objectives/<int:objective_id>', methods=['PUT'])
+@jwt_required()
+def update_objective(objective_id):
+    objective = Objective.query.get_or_404(objective_id)
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    if 'title' in data:
+        objective.title = data['title']
+    if 'description' in data:
+        objective.description = data['description']
+    if 'goal_id' in data:
+        objective.goal_id = data['goal_id']
+    db.session.commit()
+    return jsonify({'id': objective.id})
+
+@bp.route('/objectives/<int:objective_id>', methods=['DELETE'])
+@jwt_required()
+def delete_objective(objective_id):
+    objective = Objective.query.get_or_404(objective_id)
+    db.session.delete(objective)
+    db.session.commit()
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     return '', 204
 
 # BusinessRole Endpoints
 @bp.route('/business_roles', methods=['GET'])
 @jwt_required()
+<<<<<<< HEAD
 def get_business_roles() -> tuple:
     roles = BusinessRoleService.list()
     schema = BusinessRoleResponseSchema(many=True)
@@ -310,6 +600,50 @@ def delete_business_role(role_id: int) -> tuple:
     success = BusinessRoleService.delete(role_id)
     if not success:
         return error_response('BusinessRole not found', 404)
+=======
+def get_business_roles():
+    roles = BusinessRole.query.all()
+    return jsonify([{ 'id': r.id, 'name': r.name, 'description': r.description, 'user_id': r.user_id, 'tenant_id': r.tenant_id } for r in roles])
+
+@bp.route('/business_roles', methods=['POST'])
+@jwt_required()
+def create_business_role():
+    data = request.get_json()
+    if not data or not data.get('name'):
+        return jsonify({'error': 'Missing required field: name'}), 400
+    user_id, tenant_id = get_user_and_tenant()
+    role = BusinessRole(name=data['name'], description=data.get('description'), user_id=user_id, tenant_id=tenant_id)
+    db.session.add(role)
+    db.session.commit()
+    return jsonify({'id': role.id}), 201
+
+@bp.route('/business_roles/<int:role_id>', methods=['GET'])
+@jwt_required()
+def get_business_role(role_id):
+    role = BusinessRole.query.get_or_404(role_id)
+    return jsonify({ 'id': role.id, 'name': role.name, 'description': role.description, 'user_id': role.user_id, 'tenant_id': role.tenant_id })
+
+@bp.route('/business_roles/<int:role_id>', methods=['PUT'])
+@jwt_required()
+def update_business_role(role_id):
+    role = BusinessRole.query.get_or_404(role_id)
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request must be JSON'}), 400
+    if 'name' in data:
+        role.name = data['name']
+    if 'description' in data:
+        role.description = data['description']
+    db.session.commit()
+    return jsonify({'id': role.id})
+
+@bp.route('/business_roles/<int:role_id>', methods=['DELETE'])
+@jwt_required()
+def delete_business_role(role_id):
+    role = BusinessRole.query.get_or_404(role_id)
+    db.session.delete(role)
+    db.session.commit()
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     return '', 204
 
 # BusinessCollaboration Endpoints

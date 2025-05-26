@@ -1,10 +1,14 @@
 import os
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('STRATEGY_SERVICE_DATABASE_URL')
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+REDIS_URL = os.environ.get('REDIS_URL')
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///strategy_service.db')
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-dev-secret-key')
+    JWT_SECRET_KEY = JWT_SECRET_KEY
     SWAGGER = {
         'title': 'Strategy Service API',
         'uiversion': 3

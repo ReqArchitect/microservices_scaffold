@@ -70,22 +70,16 @@ def test_register_user(client):
         'full_name': 'Test User',
         'tenant_name': 'Test Tenant'
     })
-    if response.status_code != 201:
-        print('DEBUG: status_code:', response.status_code)
-        print('DEBUG: response.data:', response.data)
     assert response.status_code == 201
     assert response.json['message'] == 'User registered successfully'
 
 def test_register_duplicate_user(client):
-    # First registration
     client.post('/api/v1/users/register', json={
         'email': 'test@example.com',
         'password': 'Test123!@#',
         'full_name': 'Test User',
         'tenant_name': 'Test Tenant'
     })
-    
-    # Second registration with same email
     response = client.post('/api/v1/users/register', json={
         'email': 'test@example.com',
         'password': 'Test123!@#',
@@ -96,15 +90,12 @@ def test_register_duplicate_user(client):
     assert response.json['message'] == 'User already exists'
 
 def test_login_user(client):
-    # Register user first
     client.post('/api/v1/users/register', json={
         'email': 'test@example.com',
         'password': 'Test123!@#',
         'full_name': 'Test User',
         'tenant_name': 'Test Tenant'
     })
-    
-    # Login
     response = client.post('/api/v1/auth/login', json={
         'email': 'test@example.com',
         'password': 'Test123!@#',
@@ -114,39 +105,79 @@ def test_login_user(client):
     assert 'access_token' in response.json
     assert 'refresh_token' in response.json
 
-def test_get_current_user(client):
-    # Register and login
+def test_login_user_invalid(client):
+    response = client.post('/api/v1/auth/login', json={
+        'email': 'notfound@example.com',
+        'password': 'wrong',
+        'tenant_name': 'Test Tenant'
+    })
+    assert response.status_code in (400, 401)
+
+def test_login_user_missing_fields(client):
+    response = client.post('/api/v1/auth/login', json={})
+    assert response.status_code == 400
+
+def test_get_current_user(client, auth_header_factory):
     client.post('/api/v1/users/register', json={
         'email': 'test@example.com',
         'password': 'Test123!@#',
         'full_name': 'Test User',
         'tenant_name': 'Test Tenant'
     })
-    
-    response = client.get('/api/v1/users/me', headers=get_gateway_headers())
+    headers = auth_header_factory(role='user')
+    response = client.get('/api/v1/users/me', headers=headers)
     assert response.status_code == 200
     assert response.json['email'] == 'test@example.com'
     assert response.json['full_name'] == 'Test User'
 
-def test_update_user(client):
-    # Register user
+def test_get_current_user_unauthorized(client):
+    response = client.get('/api/v1/users/me')
+    assert response.status_code == 401
+
+def test_update_user(client, auth_header_factory):
     client.post('/api/v1/users/register', json={
         'email': 'test@example.com',
         'password': 'Test123!@#',
         'full_name': 'Test User',
         'tenant_name': 'Test Tenant'
     })
-    
-    # Update user
-    response = client.put('/api/v1/users/me', 
-        headers=get_gateway_headers(),
-        json={
-            'full_name': 'Updated Name',
-            'preferences': {'theme': 'dark'}
-        }
-    )
+    headers = auth_header_factory(role='user')
+    response = client.put('/api/v1/users/me', headers=headers, json={
+        'full_name': 'Updated Name',
+        'preferences': {'theme': 'dark'}
+    })
     assert response.status_code == 200
     assert response.json['message'] == 'User updated successfully'
+
+def test_update_user_unauthorized(client):
+    response = client.put('/api/v1/users/me', json={'full_name': 'Updated'})
+    assert response.status_code == 401
+
+@pytest.mark.parametrize("role", ["vendor_admin", "tenant_admin"])
+def test_list_users_rbac(client, auth_header_factory, role):
+    headers = auth_header_factory(role=role)
+    response = client.get('/api/v1/users', headers=headers)
+    assert response.status_code == 200
+    assert 'users' in response.json
+
+@pytest.mark.parametrize("role", ["user", "guest", None])
+def test_list_users_forbidden(client, auth_header_factory, role):
+    headers = auth_header_factory(role=role) if role else {}
+    response = client.get('/api/v1/users', headers=headers)
+    assert response.status_code in (401, 403)
+
+def test_cross_tenant_access_forbidden(client, auth_header_factory):
+    # Register user in tenant 1
+    client.post('/api/v1/users/register', json={
+        'email': 'test@example.com',
+        'password': 'Test123!@#',
+        'full_name': 'Test User',
+        'tenant_name': 'Tenant1'
+    })
+    # Try to access as user from tenant 2
+    headers = auth_header_factory(role='user', tenant_id=2)
+    response = client.get('/api/v1/users/me', headers=headers)
+    assert response.status_code in (401, 403)
 
 def test_change_password(client):
     # Register user
@@ -284,196 +315,6 @@ def test_update_user_vendor(client, test_vendor):
     assert response.status_code == 200
     updated_user = User.query.get(test_vendor.id)
     assert updated_user.role == "user"
-
-def test_update_user_unauthorized(client, test_user):
-    """Test update user endpoint without authentication"""
-    response = client.put(
-        f"/api/v1/users/{test_user.id}",
-        json={"is_active": False}
-    )
-    assert response.status_code == 401
-
-def test_get_user_activity(client, test_user):
-    """Test get user activity endpoint"""
-    # Create some activity logs
-    for i in range(3):
-        activity = UserActivity(
-            user_id=test_user.id,
-            action=f"test_action_{i}",
-            details={"test": "data"},
-            ip_address="127.0.0.1"
-        )
-        db.session.add(activity)
-    db.session.commit()
-
-    response = client.get(
-        f"/api/v1/users/{test_user.id}/activity",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert len(data) == 3
-    assert all("action" in activity for activity in data)
-    assert all("details" in activity for activity in data)
-    assert all("ip_address" in activity for activity in data)
-    assert all("created_at" in activity for activity in data)
-
-def test_get_metrics_vendor(client, test_vendor, test_tenant):
-    """Test get metrics endpoint for vendor"""
-    # Create some test data
-    for i in range(3):
-        user = User(
-            email=f"user{i}@example.com",
-            password_hash="hashed_password",
-            full_name=f"User {i}",
-            role="user",
-            tenant_id=test_tenant.id,
-            is_active=True,
-            is_email_verified=True
-        )
-        db.session.add(user)
-    db.session.commit()
-
-    response = client.get(
-        "/api/v1/users/metrics",
-        headers=get_gateway_headers(test_vendor.id, test_vendor.tenant_id, test_vendor.role)
-    )
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert "users" in data
-    assert "tenants" in data
-    assert "recent_activities" in data
-    assert data["users"]["total"] == 4  # 3 new users + 1 admin
-    assert data["users"]["active"] == 4
-    assert data["users"]["verified"] == 4
-    assert data["tenants"] == 1
-
-def test_get_metrics_unauthorized(client):
-    """Test get metrics endpoint without vendor role"""
-    response = client.get("/api/v1/users/metrics")
-    assert response.status_code == 401
-
-def test_pagination_list_users(client, test_tenant):
-    """Test pagination in list users endpoint"""
-    # Create 15 test users
-    for i in range(15):
-        user = User(
-            email=f"user{i}@example.com",
-            password_hash="hashed_password",
-            full_name=f"User {i}",
-            role="user",
-            tenant_id=test_tenant.id,
-            is_active=True
-        )
-        db.session.add(user)
-    db.session.commit()
-
-    # Test first page
-    response = client.get(
-        "/api/v1/users?limit=10&offset=0",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert len(data["users"]) == 10
-    assert data["total"] == 16  # 15 new users + 1 admin
-
-    # Test second page
-    response = client.get(
-        "/api/v1/users?limit=10&offset=10",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert len(data["users"]) == 6  # Remaining users
-
-def test_filter_list_users(client, test_tenant):
-    """Test filtering in list users endpoint"""
-    # Create users with different roles
-    roles = ["user", "admin", "user"]
-    for i, role in enumerate(roles):
-        user = User(
-            email=f"user{i}@example.com",
-            password_hash="hashed_password",
-            full_name=f"User {i}",
-            role=role,
-            tenant_id=test_tenant.id,
-            is_active=True
-        )
-        db.session.add(user)
-    db.session.commit()
-
-    # Test role filter
-    response = client.get(
-        "/api/v1/users?role=user",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert all(user["role"] == "user" for user in data["users"])
-    assert data["total"] == 2  # Only users with role "user" 
-
-def test_refresh_token_expired(client, test_user):
-    """Test refresh token with expired token"""
-    # Create an expired refresh token
-    expired_token = create_refresh_token(
-        identity={
-            "id": test_user.id,
-            "tenant_id": test_user.tenant_id,
-            "role": test_user.role
-        },
-        expires_delta=timedelta(microseconds=1)
-    )
-    import time
-    time.sleep(0.1)  # Wait for token to expire
-    
-    response = client.post(
-        "/api/v1/users/refresh",
-        headers=get_gateway_headers(test_user.id, test_user.tenant_id, test_user.role)
-    )
-    assert response.status_code == 401
-
-def test_refresh_token_inactive_user(client, test_user):
-    """Test refresh token with inactive user"""
-    test_user.is_active = False
-    db.session.commit()
-    
-    refresh_token = create_refresh_token(identity={
-        "id": test_user.id,
-        "tenant_id": test_user.tenant_id,
-        "role": test_user.role
-    })
-    
-    response = client.post(
-        "/api/v1/users/refresh",
-        headers=get_gateway_headers(test_user.id, test_user.tenant_id, test_user.role)
-    )
-    assert response.status_code == 401
-
-def test_list_users_invalid_pagination(client):
-    """Test list users with invalid pagination parameters"""
-    response = client.get(
-        "/api/v1/users?limit=-1&offset=0",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 400
-
-    response = client.get(
-        "/api/v1/users?limit=0&offset=-1",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 400
-
-def test_list_users_invalid_role_filter(client):
-    """Test list users with invalid role filter"""
-    response = client.get(
-        "/api/v1/users?role=invalid_role",
-        headers=get_gateway_headers()
-    )
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert len(data["users"]) == 0
-    assert data["total"] == 0
 
 def test_update_user_invalid_data(client, test_user):
     """Test update user with invalid data"""

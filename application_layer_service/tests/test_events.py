@@ -4,26 +4,39 @@ from app.models import ApplicationComponent, ApplicationService, ApplicationInte
 from app import db
 import json
 
-def test_capability_event_handler(app, client):
+@pytest.fixture
+def component():
+    return ApplicationComponent(
+        name="Test Component",
+        description="Test Description",
+        user_id=1,
+        tenant_id=1,
+        capability_context_id=100
+    )
+
+@pytest.fixture
+def service():
+    return ApplicationService(
+        name="Test Service",
+        description="Test Description",
+        user_id=1,
+        tenant_id=1,
+        capability_context_id=100
+    )
+
+@pytest.fixture
+def interface():
+    return ApplicationInterface(
+        name="Test Interface",
+        description="Test Description",
+        user_id=1,
+        tenant_id=1,
+        course_of_action_context_id=200
+    )
+
+def test_capability_event_handler(app, client, component, service):
     """Test that capability events are properly handled"""
     with app.app_context():
-        # Create components linked to capability
-        component = ApplicationComponent(
-            name="Test Component",
-            description="Test Description",
-            user_id=1,
-            tenant_id=1,
-            capability_context_id=100
-        )
-        
-        service = ApplicationService(
-            name="Test Service",
-            description="Test Description",
-            user_id=1,
-            tenant_id=1,
-            capability_context_id=100
-        )
-        
         db.session.add(component)
         db.session.add(service)
         db.session.commit()
@@ -63,17 +76,9 @@ def test_capability_event_handler(app, client):
         assert comp_payload['capability_context_id'] == 100
         assert svc_payload['capability_context_id'] == 100
 
-def test_course_of_action_event_handler(app, client):
+def test_course_of_action_event_handler(app, client, interface):
     """Test that course of action events are properly handled"""
     with app.app_context():
-        # Create interface linked to course of action
-        interface = ApplicationInterface(
-            name="Test Interface",
-            description="Test Description",
-            user_id=1,
-            tenant_id=1,
-            course_of_action_context_id=200
-        )
         db.session.add(interface)
         db.session.commit()
         
@@ -101,3 +106,16 @@ def test_course_of_action_event_handler(app, client):
         assert interface_event is not None
         payload = json.loads(interface_event.payload)
         assert payload['course_of_action_context_id'] == 200
+
+def test_capability_event_handler_invalid_payload(app, client, component):
+    with app.app_context():
+        db.session.add(component)
+        db.session.commit()
+        event = OutboxEvent(
+            event_type="CapabilityUpdated",
+            aggregate_type="Capability",
+            aggregate_id="100",
+            payload="not a json"
+        )
+        with pytest.raises(Exception):
+            handle_capability_event(event)

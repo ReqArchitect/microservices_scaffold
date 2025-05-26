@@ -3,13 +3,15 @@ Configuration for the template service
 """
 import os
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('TEMPLATE_SERVICE_DATABASE_URL')
+
 class Config:
     # Basic Flask configuration
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
     
     # Database configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///template_service.db')
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # JWT configuration

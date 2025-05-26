@@ -6,10 +6,14 @@ from .models import db
 from .services import PolicyService
 from .schemas import PolicySchema
 from flasgger import swag_from
+from common_utils.auth import rbac_required
+from common_utils.traceability import log_audit_event
 
 bp = Blueprint('validation', __name__)
 
 @bp.route('/validate', methods=['POST'])
+@rbac_required(roles=['admin', 'validator'])
+@swag_from({})
 def validate():
     payload = request.json
     opa_url = current_app.config['OPA_URL']
@@ -28,6 +32,7 @@ def validate():
         return jsonify({'allowed': False, 'reason': 'OPA error'}), 500
     # Placeholder for GPT-4 semantic validation (extend here)
     # gpt4_result = ...
+    log_audit_event(current_app.logger, 'validate', {'details': 'Validation performed'})
     return jsonify({'allowed': True, 'reason': 'OPA policy allowed'}), 200
 
 bp = Blueprint('policy', __name__, url_prefix='/policies')
@@ -85,3 +90,8 @@ def health():
 @bp.route('/metrics', methods=['GET'])
 def metrics():
     return 'validation_service_up 1\n', 200, {'Content-Type': 'text/plain'}
+
+# Global error handlers
+@bp.errorhandler(Exception)
+def handle_general_error(error):
+    return jsonify({'message': str(error)}), 500

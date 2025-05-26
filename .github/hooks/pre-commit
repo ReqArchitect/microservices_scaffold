@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Block forbidden root-level files
+for f in $(git diff --cached --name-only); do
+  if [[ $f =~ ^[^/]+\.(py|sh|txt|md|yaml|yml|ini|cfg|toml)$ ]]; then
+    case $f in
+      docker-compose.yml|README.md) ;; # allowed
+      *)
+        echo "[ERROR] Forbidden file at root: $f"
+        echo "All scripts, configs, docs, and requirements must be in their respective folders."
+        exit 1
+        ;;
+    esac
+  fi
+done
+
+exit 0 

@@ -22,8 +22,11 @@ def process_outbox_events():
     """Background thread to process outbox events"""
     with app.app_context():
         from common_utils.outbox import OutboxProcessor
+<<<<<<< HEAD
         import requests
         from requests.exceptions import RequestException
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
         
         # Setup processor with handlers
         processor = OutboxProcessor(db, OutboxEvent)
@@ -34,6 +37,7 @@ def process_outbox_events():
             """Handle capability created events"""
             try:
                 logger.info(f"Processing capability_created event: {aggregate_id}")
+<<<<<<< HEAD
                 
                 # Notify business layer service
                 business_layer_url = app.config.get('BUSINESS_LAYER_SERVICE_URL', 'http://localhost:5002')
@@ -125,6 +129,13 @@ def process_outbox_events():
                     
             except RequestException as e:
                 logger.error(f"Error processing capability_deleted event {aggregate_id}: {str(e)}")
+=======
+                # Logic to notify business layer service or other dependent services
+                # For example, using requests.post or other mechanisms
+                # This could use circuit breaker, etc.
+            except Exception as e:
+                logger.error(f"Error processing capability_created event: {str(e)}")
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
                 raise
         
         # Main processing loop

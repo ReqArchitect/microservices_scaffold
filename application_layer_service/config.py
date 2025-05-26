@@ -1,11 +1,10 @@
 import os
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('APPLICATION_LAYER_SERVICE_DATABASE_URL')
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'DATABASE_URL',
-        'postgresql://postgres:password@localhost/application_layer_service'
-    )
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-dev-secret-key')
     SWAGGER = {

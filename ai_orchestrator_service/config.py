@@ -3,13 +3,15 @@ Configuration for the AI Orchestrator Service
 """
 import os
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('AI_ORCHESTRATOR_SERVICE_DATABASE_URL')
+
 class Config:
     # Basic Flask configuration
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
     
     # Database configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///ai_orchestrator_service.db')
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # JWT configuration

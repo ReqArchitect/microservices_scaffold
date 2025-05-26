@@ -65,6 +65,7 @@ def test_get_objectives(client, auth_header):
     resp = client.get('/api/objectives', headers=auth_header)
     assert resp.status_code == 200
     assert isinstance(resp.get_json(), list)
+<<<<<<< HEAD
 
 # --- BusinessCollaboration ---
 def test_create_business_collaboration(client, auth_header):
@@ -173,3 +174,5 @@ def test_get_products(client, auth_header):
     resp = client.get('/products', headers=auth_header)
     assert resp.status_code == 200
     assert isinstance(resp.get_json(), list)
+=======
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3

@@ -40,6 +40,7 @@ class Capability(db.Model, OutboxMixin):
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     status = db.Column(db.String(50), nullable=False, default='draft')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -48,12 +49,19 @@ class Capability(db.Model, OutboxMixin):
     business_context_id = db.Column(db.Integer, nullable=True)  # Reference to Business context
     initiative_context_id = db.Column(db.Integer, nullable=True)  # Reference to Initiative context
       def to_dict(self):
+=======
+    business_case_id = db.Column(db.Integer, nullable=True)
+    initiative_id = db.Column(db.Integer, nullable=True)
+    
+    def to_dict(self):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
         return {
             'id': self.id,
             'title': self.title,
             'description': self.description,
             'user_id': self.user_id,
             'tenant_id': self.tenant_id,
+<<<<<<< HEAD
             'status': self.status,
             'business_context_id': self.business_context_id,
             'initiative_context_id': self.initiative_context_id,
@@ -83,6 +91,11 @@ class Capability(db.Model, OutboxMixin):
             aggregate_id=str(self.id),
             payload=self.to_dict()
         )
+=======
+            'business_case_id': self.business_case_id,
+            'initiative_id': self.initiative_id
+        }
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 class CourseOfAction(db.Model, OutboxMixin):
     __outbox_enabled__ = True
@@ -92,21 +105,34 @@ class CourseOfAction(db.Model, OutboxMixin):
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     status = db.Column(db.String(50), nullable=False, default='draft')
     initiative_context_id = db.Column(db.Integer, nullable=True)  # Reference to Initiative context
     capability_context_id = db.Column(db.Integer, nullable=True)  # Reference to Capability context
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
       def to_dict(self):
+=======
+    initiative_id = db.Column(db.Integer, nullable=True)
+    capability_id = db.Column(db.Integer, db.ForeignKey('capability.id'), nullable=True)
+    capability = db.relationship('Capability', backref='courses_of_action')
+    
+    def to_dict(self):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
         return {
             'id': self.id,
             'title': self.title,
             'description': self.description,
             'user_id': self.user_id,
             'tenant_id': self.tenant_id,
+<<<<<<< HEAD
             'status': self.status,
             'initiative_context_id': self.initiative_context_id,
             'capability_context_id': self.capability_context_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+=======
+            'initiative_id': self.initiative_id,
+            'capability_id': self.capability_id
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
         }

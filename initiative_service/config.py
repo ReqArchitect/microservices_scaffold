@@ -12,7 +12,7 @@ class Config:
     
     # Core settings
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev')
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:password@localhost:5432/initiative_service")
+    SQLALCHEMY_DATABASE_URI = os.environ.get('INITIATIVE_SERVICE_DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
@@ -21,7 +21,7 @@ class Config:
     }
 
     # JWT
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-jwt-secret')
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
     JWT_ALGORITHM = 'HS256'
@@ -59,7 +59,7 @@ class Config:
 
     # Rate Limiting
     RATELIMIT_ENABLED = True
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    RATELIMIT_STORAGE_URL = os.environ.get('REDIS_URL')
     RATELIMIT_STRATEGY = "fixed-window"
     RATELIMIT_DEFAULT = "200 per day;50 per hour"
     RATELIMIT_HEADERS_ENABLED = True
@@ -83,7 +83,7 @@ class Config:
 
     # Cache
     CACHE_TYPE = "redis"
-    CACHE_REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    CACHE_REDIS_URL = os.environ.get('REDIS_URL')
     CACHE_DEFAULT_TIMEOUT = 300
 
     # Metrics
@@ -147,8 +147,8 @@ class ProductionConfig(Config):
     CACHE_TYPE = "redis"
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_ECHO = False
-    CACHE_REDIS_URL = os.getenv('REDIS_URL')
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL')
+    CACHE_REDIS_URL = os.environ.get('REDIS_URL')
+    RATELIMIT_STORAGE_URL = os.environ.get('REDIS_URL')
 
 config = {
     'development': DevelopmentConfig,

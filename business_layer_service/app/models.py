@@ -30,26 +30,41 @@ class OutboxEvent(db.Model):
         session.add(event)
         return event
 
+<<<<<<< HEAD
 class BusinessActor(db.Model, OutboxMixin):
     __outbox_enabled__ = True
     
+=======
+class BusinessActor(db.Model):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     initiative_context_id = db.Column(db.Integer, nullable=True)  # Reference to Initiative context
 
 class BusinessProcess(db.Model, OutboxMixin):
     __outbox_enabled__ = True
     
+=======
+    initiative_id = db.Column(db.Integer, nullable=True)
+
+class BusinessProcess(db.Model):
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text)
     user_id = db.Column(db.Integer, nullable=False)
     tenant_id = db.Column(db.Integer, nullable=False)
+<<<<<<< HEAD
     initiative_context_id = db.Column(db.Integer, nullable=True)  # Reference to Initiative context
     kpi_context_id = db.Column(db.Integer, nullable=True)  # Reference to KPI context
+=======
+    initiative_id = db.Column(db.Integer, nullable=True)
+    kpi_id = db.Column(db.Integer, nullable=True)
+>>>>>>> c79de3895fdb976591eac782eb2c8461b8bbbfa3
 
 class Goal(db.Model):
     id = db.Column(db.Integer, primary_key=True)

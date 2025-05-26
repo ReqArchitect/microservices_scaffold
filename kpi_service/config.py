@@ -4,10 +4,14 @@ from dotenv import load_dotenv
 # Load environment variables from a .env file
 load_dotenv()
 
+SQLALCHEMY_DATABASE_URI = os.environ.get('KPI_SERVICE_DATABASE_URL')
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+REDIS_URL = os.environ.get('REDIS_URL')
+
 class Config:
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///kpi_service.db')
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default_secret_key')
+    JWT_SECRET_KEY = JWT_SECRET_KEY
     DEBUG = os.getenv('DEBUG', 'False').lower() in ['true', '1', 't']
     
     # Service identity and discovery
@@ -65,10 +69,10 @@ class ProductionConfig(Config):
     LOG_LEVEL = "WARNING"
     RATELIMIT_ENABLED = True
     CACHE_TYPE = "redis"
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_ECHO = False
-    CACHE_REDIS_URL = os.getenv('REDIS_URL')
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL')
+    CACHE_REDIS_URL = REDIS_URL
+    RATELIMIT_STORAGE_URL = REDIS_URL
 
 config = {
     'development': DevelopmentConfig,

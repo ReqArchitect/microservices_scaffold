@@ -1,220 +1,208 @@
 version: '3.8'
 
-services:
-  strategy_service:
-    build: ./strategy_service
-    command: python main.py
-    ports:
-      - "5001:5001"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@strategy_db:5432/strategy_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - strategy_db
-    networks:
-      - reqarchitect
+x-service-defaults: &service-defaults
+  restart: always
+  networks:
+    - backend
+  depends_on:
+    - postgres
+    - redis
+  environment:
+    REDIS_URL: ${REDIS_URL}
+    JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    POSTGRES_HOST: ${POSTGRES_HOST}
+    POSTGRES_PORT: ${POSTGRES_PORT}
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-  business_layer_service:
-    build: ./business_layer_service
-    command: python main.py
-    ports:
-      - "5002:5002"
+services:
+  postgres:
+    image: postgres:15
+    restart: always
     environment:
-      - DATABASE_URL=postgresql://postgres:password@business_db:5432/business_layer_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - business_db
-    networks:
-      - reqarchitect
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   user_service:
+    <<: *service-defaults
     build: ./user_service
-    command: python main.py
+    environment:
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${USER_SERVICE_DATABASE_URL}
     ports:
       - "5000:5000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@user_db:5432/user_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - user_db
-    networks:
-      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   auth_service:
+    <<: *service-defaults
     build: ./auth_service
-    command: python main.py
-    ports:
-      - "5006:5006"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@auth_db:5432/auth_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - auth_db
-    networks:
-      - reqarchitect
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${AUTH_SERVICE_DATABASE_URL}
+    ports:
+      - "5001:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   initiative_service:
+    <<: *service-defaults
     build: ./initiative_service
-    command: python main.py
-    ports:
-      - "5002:5002"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@initiative_db:5432/initiative_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - initiative_db
-    networks:
-      - reqarchitect
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${INITIATIVE_SERVICE_DATABASE_URL}
+    ports:
+      - "5002:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  business_layer_service:
+    <<: *service-defaults
+    build: ./business_layer_service
+    environment:
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${BUSINESS_LAYER_SERVICE_DATABASE_URL}
+    ports:
+      - "5003:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  strategy_service:
+    <<: *service-defaults
+    build: ./strategy_service
+    environment:
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${STRATEGY_SERVICE_DATABASE_URL}
+    ports:
+      - "5004:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kpi_service:
+    <<: *service-defaults
     build: ./kpi_service
-    command: python main.py
-    ports:
-      - "5003:5003"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@kpi_db:5432/kpi_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - kpi_db
-    networks:
-      - reqarchitect
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${KPI_SERVICE_DATABASE_URL}
+    ports:
+      - "5005:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   business_case_service:
+    <<: *service-defaults
     build: ./business_case_service
-    command: python main.py
-    ports:
-      - "5004:5004"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@business_case_db:5432/business_case_service
-      - JWT_SECRET_KEY=jwt-dev-secret-key
-    depends_on:
-      - business_case_db
-    networks:
-      - reqarchitect
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${BUSINESS_CASE_SERVICE_DATABASE_URL}
+    ports:
+      - "5006:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   notification_service:
+    <<: *service-defaults
     build: ./notification_service
-    command: python main.py
-    ports:
-      - "5007:5007"
     environment:
-      - DATABASE_URL=sqlite:///notification_service.db
-    networks:
-      - reqarchitect
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${NOTIFICATION_SERVICE_DATABASE_URL}
+    ports:
+      - "5007:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5007/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   billing_service:
+    <<: *service-defaults
     build: ./billing_service
-    command: python main.py
-    ports:
-      - "5008:5008"
     environment:
-      - DATABASE_URL=sqlite:///billing_service.db
-    networks:
-      - reqarchitect
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${BILLING_SERVICE_DATABASE_URL}
+    ports:
+      - "5008:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5008/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   file_service:
+    <<: *service-defaults
     build: ./file_service
-    command: python main.py
-    ports:
-      - "5009:5009"
     environment:
-      - DATABASE_URL=sqlite:///file_service.db
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${FILE_SERVICE_DATABASE_URL}
+    ports:
+      - "5009:5000"
     volumes:
       - ./file_service/uploads:/app/uploads
-    networks:
-      - reqarchitect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5009/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   implementation_migration_service:
+    <<: *service-defaults
     build: ./implementation_migration_service
-    command: python main.py
-    ports:
-      - "5010:5010"
     environment:
-      - DATABASE_URL=sqlite:///implementation_migration_service.db
-    networks:
-      - reqarchitect
-
-  strategy_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: strategy_service
+      <<: *service-defaults
+      SQLALCHEMY_DATABASE_URI: ${IMPLEMENTATION_MIGRATION_SERVICE_DATABASE_URL}
     ports:
-      - "5433:5432"
-    networks:
-      - reqarchitect
-
-  business_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: business_layer_service
-    ports:
-      - "5434:5432"
-    networks:
-      - reqarchitect
-
-  user_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: user_service
-    ports:
-      - "5435:5432"
-    networks:
-      - reqarchitect
-
-  auth_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: auth_service
-    ports:
-      - "5436:5432"
-    networks:
-      - reqarchitect
-
-  initiative_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: initiative_service
-    ports:
-      - "5437:5432"
-    networks:
-      - reqarchitect
-
-  kpi_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: kpi_service
-    ports:
-      - "5438:5432"
-    networks:
-      - reqarchitect
-
-  business_case_db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: business_case_service
-    ports:
-      - "5439:5432"
-    networks:
-      - reqarchitect
+      - "5010:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5010/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   e2e_tests:
     build:
       context: .
-      dockerfile: Dockerfile.e2e
+      dockerfile: docs/Dockerfile.e2e
     depends_on:
       - strategy_service
       - business_layer_service
@@ -224,17 +212,20 @@ services:
       - kpi_service
       - business_case_service
     networks:
-      - reqarchitect
+      - backend
     environment:
-      - STRATEGY_URL=http://strategy_service:5001/api/capabilities
-      - BUSINESS_URL=http://business_layer_service:5002/api/business_actors
-      - USER_SERVICE_URL=http://user_service:5000/health
-      - AUTH_SERVICE_URL=http://auth_service:5006/health
-      - INITIATIVE_SERVICE_URL=http://initiative_service:5002/health
-      - KPI_SERVICE_URL=http://kpi_service:5003/health
-      - BUSINESS_CASE_SERVICE_URL=http://business_case_service:5004/health
-      - JWT_SECRET_KEY=jwt-dev-secret-key
+      STRATEGY_URL: http://strategy_service:5004/api/capabilities
+      BUSINESS_URL: http://business_layer_service:5003/api/business_actors
+      USER_SERVICE_URL: http://user_service:5000/health
+      AUTH_SERVICE_URL: http://auth_service:5001/health
+      INITIATIVE_SERVICE_URL: http://initiative_service:5002/health
+      KPI_SERVICE_URL: http://kpi_service:5005/health
+      BUSINESS_CASE_SERVICE_URL: http://business_case_service:5006/health
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
 
 networks:
-  reqarchitect:
+  backend:
     driver: bridge
+
+volumes:
+  pgdata:

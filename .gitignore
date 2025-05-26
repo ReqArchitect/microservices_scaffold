@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+Icon?
+
+# Environment/config
+.env
+.env.*
+*.local
+
+# Backups/logs
+backups/
+logs/
+*.log
+
+# Test cache
+.pytest_cache/
+coverage/
+.coverage
+htmlcov/
+
+# Node/npm (if any)
+node_modules/
+
+# Root-level enforcement
+# Forbid root-level .py, .sh, .txt, .md, .yaml, .yml, .ini, .cfg, .toml, except in allowed folders
+!scripts/*.py
+!requirements/*.txt
+!config/*
+!docs/*
+!tests/*
+!common_utils/*
+!docker-compose.yml
+
+# Allow only these files at root
+!/docker-compose.yml
+!/README.md
+
+# Remove/ignore redundant folders
+performance/
+chaos_testing/
+tools/ 
