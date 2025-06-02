@@ -10,7 +10,7 @@ Flask-Limiter==3.5.0
 Flasgger==0.9.7.1
 python-dotenv==1.0.0
 psycopg[binary]
-prometheus-client==0.17.1
+prometheus-client==0.22.1
 prometheus-flask-exporter==0.22.4
 pytest==7.4.2
 pytest-cov==4.1.0
