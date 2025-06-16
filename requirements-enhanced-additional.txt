@@ -7,7 +7,7 @@ opentelemetry-api==1.16.0
 opentelemetry-sdk==1.16.0
 opentelemetry-instrumentation-flask==0.37b0
 opentelemetry-exporter-jaeger==1.16.0
-opentelemetry-instrumentation-requests==0.37b0
+opentelemetry-instrumentation-requests==0.55b1
 flask-prometheus-metrics==1.0.0
 jaeger-client==4.8.0
 
